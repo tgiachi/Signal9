@@ -16,6 +16,7 @@ import { useJobsContext } from '@/features/jobs/jobs-context-value';
 import { JobQueuePanel } from '@/features/jobs/job-queue-panel';
 import { useLogStreamContext } from '@/features/logs/log-stream-ctx';
 import { LogRow } from '@/features/logs/log-row';
+import { Pill } from '@/components/ui/pill';
 
 export function MonitorPage() {
   const auth = useAuth();
@@ -28,25 +29,25 @@ export function MonitorPage() {
 
   return (
     <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.85fr)]">
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-panel">
-        <header className="flex flex-wrap items-center gap-2 border-b border-border-subtle bg-panel-strong px-3 py-2">
-          <div className="flex size-7 items-center justify-center rounded-md border border-on-air/30 bg-on-air/10 text-on-air-2">
+      <section className="flex min-h-0 flex-col overflow-hidden rounded-[6px] bg-bg-2">
+        <header className="flex flex-wrap items-center gap-2 bg-bg-4 px-3 py-2">
+          <div className="flex size-7 items-center justify-center rounded-[4px] bg-accent-live text-bg-5">
             <RadioTower className="size-4" />
           </div>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold text-fg-0">Broadcast Monitor</h1>
-            <p className="font-mono text-[10px] text-fg-2">
+            <p className="font-mono text-[10px] text-fg-3">
               SignalR logs: {logs.connection} · jobs:{' '}
               {auth.authenticated ? jobs.connection : 'locked'}
             </p>
           </div>
           <div className="ml-auto flex flex-wrap gap-1">
-            <StatusBadge label="/health" status={health.health.status} />
-            <StatusBadge label="/live" status={health.live.status} />
-            <StatusBadge label="JWT" status={auth.authenticated ? 'ok' : 'unknown'} />
+            <StatusPill label="/health" status={health.health.status} />
+            <StatusPill label="/live" status={health.live.status} />
+            <StatusPill label="JWT" status={auth.authenticated ? 'ok' : 'unknown'} />
           </div>
         </header>
-        <div className="grid gap-3 border-b border-border-subtle p-3 md:grid-cols-4">
+        <div className="grid gap-3 bg-bg-2 p-3 md:grid-cols-4">
           <Metric
             icon={<Signal className="size-4" />}
             label="On-air"
@@ -72,22 +73,24 @@ export function MonitorPage() {
             tone={summary.valid ? 'ok' : 'error'}
           />
         </div>
-        <div className="min-h-0 flex-1 overflow-auto bg-bg-1">
-          <div className="grid min-w-[44rem] grid-cols-[5.5rem_4rem_minmax(7rem,11rem)_minmax(0,1fr)] gap-3 border-b border-border-subtle bg-bg-2 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-2">
+        <div className="min-h-0 flex-1 overflow-auto bg-bg-0">
+          <div className="grid min-w-[44rem] grid-cols-[5.5rem_4rem_minmax(7rem,11rem)_minmax(0,1fr)] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
             <span>Time</span>
             <span>Level</span>
             <span>Source</span>
             <span>Message</span>
           </div>
           {recentLogs.length === 0 ? (
-            <div className="flex h-56 items-center justify-center text-sm text-fg-2">
+            <div className="flex h-56 items-center justify-center text-sm text-fg-3">
               Waiting for live log entries.
             </div>
           ) : (
-            recentLogs.map((entry, index) => <LogRow key={`${entry.ts}-${index}`} entry={entry} />)
+            recentLogs.map((entry, index) => (
+              <LogRow key={`${entry.ts}-${index}`} entry={entry} />
+            ))
           )}
         </div>
-        <footer className="flex items-center justify-between border-t border-border-subtle bg-panel-strong px-3 py-2 font-mono text-[10px] text-fg-2">
+        <footer className="flex items-center justify-between bg-bg-4 px-3 py-2 font-mono text-[10px] text-fg-3">
           <span>Messages: {logs.entries.length}</span>
           <span>Errors (1m): {logs.errorCountLastMinute}</span>
         </footer>
@@ -97,7 +100,9 @@ export function MonitorPage() {
           compact
           jobs={jobs.jobs}
           maxConcurrentJobs={summary.maxConcurrentJobs}
-          emptyLabel={jobs.authenticated ? 'No jobs in memory.' : 'Login required for job queue.'}
+          emptyLabel={
+            jobs.authenticated ? 'No jobs in memory.' : 'Login required for job queue.'
+          }
           onCancel={
             jobs.authenticated
               ? (jobId) => {
@@ -107,13 +112,13 @@ export function MonitorPage() {
           }
           isCanceling={jobs.isCanceling}
         />
-        <section className="rounded-lg border border-border bg-panel">
-          <header className="flex items-center gap-2 border-b border-border-subtle bg-panel-strong px-3 py-2">
-            <SlidersHorizontal className="size-4 text-cyan" />
+        <section className="overflow-hidden rounded-[6px] bg-bg-2">
+          <header className="flex items-center gap-2 bg-bg-4 px-3 py-2">
+            <SlidersHorizontal className="size-4 text-accent-cfg" />
             <h2 className="text-sm font-semibold text-fg-0">System Config</h2>
-            <span className="ml-auto rounded border border-on-air/40 bg-on-air/10 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-on-air-2">
+            <Pill variant={summary.valid ? 'live' : 'err'} className="ml-auto">
               TOML {summary.valid ? 'valid' : 'invalid'}
-            </span>
+            </Pill>
           </header>
           <div className="grid gap-0 md:grid-cols-2">
             <ConfigRow label="Database URL" value={summary.databaseUrl} />
@@ -129,18 +134,12 @@ export function MonitorPage() {
   );
 }
 
-function StatusBadge({ label, status }: { label: string; status: EndpointStatus }) {
+function StatusPill({ label, status }: { label: string; status: EndpointStatus }) {
+  const variant = status === 'ok' ? 'live' : status === 'down' ? 'err' : 'health';
   return (
-    <span
-      className={cn(
-        'rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-label',
-        status === 'ok' && 'border-on-air/40 bg-on-air/10 text-on-air-2',
-        status === 'down' && 'border-error/50 bg-error-bg/60 text-error',
-        status === 'unknown' && 'border-border bg-bg-2 text-fg-2',
-      )}
-    >
+    <Pill variant={variant}>
       {label} {status}
-    </span>
+    </Pill>
   );
 }
 
@@ -156,18 +155,18 @@ function Metric({
   tone: 'ok' | 'warn' | 'error';
 }) {
   return (
-    <div className="min-w-0 rounded-md border border-border-subtle bg-bg-1 p-3">
+    <div className="min-w-0 rounded-[6px] bg-bg-3 p-3">
       <div
         className={cn(
-          'mb-2 flex size-7 items-center justify-center rounded border',
-          tone === 'ok' && 'border-on-air/40 bg-on-air/10 text-on-air-2',
-          tone === 'warn' && 'border-warn/40 bg-warn/10 text-warn',
-          tone === 'error' && 'border-error/50 bg-error-bg/60 text-error',
+          'mb-2 flex size-7 items-center justify-center rounded-[4px]',
+          tone === 'ok' && 'bg-accent-live text-bg-5',
+          tone === 'warn' && 'bg-accent-warn text-bg-0',
+          tone === 'error' && 'bg-accent-err text-fg-0',
         )}
       >
         {icon}
       </div>
-      <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</div>
+      <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</div>
       <div className="truncate text-base font-semibold text-fg-0">{value}</div>
     </div>
   );
@@ -175,9 +174,9 @@ function Metric({
 
 function ConfigRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 border-b border-border-subtle px-3 py-2 md:odd:border-r">
-      <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</div>
-      <div className="truncate font-mono text-[12px] text-fg-0">{value}</div>
+    <div className="min-w-0 bg-bg-2 px-3 py-2 md:odd:bg-bg-3">
+      <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</div>
+      <div className="truncate font-mono text-[12px] text-fg-1">{value}</div>
     </div>
   );
 }
