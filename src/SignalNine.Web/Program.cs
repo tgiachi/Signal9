@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.OpenApi;
 using Serilog;
 using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services;
 using SignalNine.Core.Types;
+using SignalNine.Persistence.Entities.Users;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Services;
 using SignalNine.Web.Endpoints;
@@ -43,6 +45,7 @@ builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
 builder.Services.AddSingleton(freeSql);
 builder.Services.AddScoped(typeof(IDataAccess<>), typeof(FreeSqlDataAccess<>));
+builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
 builder.Services.AddHostedService<JobWorkerService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
        .AddJwtBearer(
@@ -119,6 +122,7 @@ app.MapHealthChecks(
    .AllowAnonymous();
 app.MapHealthChecks("/health")
    .AllowAnonymous();
+app.MapAuthenticationEndpoints();
 app.MapJobEndpoints();
 app.MapHub<JobStatusHub>("/hubs/jobs/status")
    .RequireAuthorization();
