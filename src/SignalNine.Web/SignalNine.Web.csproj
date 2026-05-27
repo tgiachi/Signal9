@@ -20,6 +20,11 @@
       </Content>
     </ItemGroup>
 
+    <!-- Ensure wwwroot/ exists so StaticWebAssets manifest resolves even before the UI is built. -->
+    <Target Name="EnsureWwwroot" BeforeTargets="GenerateStaticWebAssetsManifest;BeforeBuild">
+      <MakeDir Directories="$(MSBuildProjectDirectory)/wwwroot" />
+    </Target>
+
     <ItemGroup>
       <ProjectReference Include="..\SignalNine.Core\SignalNine.Core.csproj" />
       <ProjectReference Include="..\SignalNine.Persistence\SignalNine.Persistence.csproj" />

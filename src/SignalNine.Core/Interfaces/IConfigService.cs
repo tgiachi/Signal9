@@ -25,4 +25,18 @@ public interface IConfigService
     /// <param name="config">The configuration to persist.</param>
     /// <param name="cancellationToken">Token used to cancel the file operation.</param>
     Task SaveAsync(SignalNineConfig config, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Validates that the supplied TOML text deserializes into a valid <see cref="SignalNineConfig" />.
+    /// </summary>
+    /// <param name="toml">The TOML text to validate.</param>
+    /// <returns>A result describing success or the validation error (with optional line/column when available).</returns>
+    TomlValidationResult Validate(string toml);
+
+    /// <summary>
+    /// Persists the supplied raw TOML text to the configuration file after a successful <see cref="Validate" />.
+    /// </summary>
+    /// <param name="toml">The validated TOML text to persist.</param>
+    /// <param name="cancellationToken">Token used to cancel the file operation.</param>
+    Task SaveRawAsync(string toml, CancellationToken cancellationToken = default);
 }

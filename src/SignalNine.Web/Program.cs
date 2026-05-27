@@ -47,6 +47,7 @@ builder.Services.AddSingleton(freeSql);
 builder.Services.AddScoped(typeof(IDataAccess<>), typeof(FreeSqlDataAccess<>));
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
 builder.Services.AddHostedService<JobWorkerService>();
+builder.Services.AddHostedService<LogsBroadcastService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
        .AddJwtBearer(
            options =>
@@ -123,10 +124,13 @@ app.MapHealthChecks(
 app.MapHealthChecks("/health")
    .AllowAnonymous();
 app.MapAuthenticationEndpoints();
+app.MapConfigEndpoints();
 app.MapJobEndpoints();
 app.MapHub<JobStatusHub>("/hubs/jobs/status")
    .RequireAuthorization();
 app.MapHub<JobLogHub>("/hubs/jobs/logs")
    .RequireAuthorization();
+app.MapHub<LogsHub>("/hubs/logs")
+   .AllowAnonymous();
 
 app.Run();

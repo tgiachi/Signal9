@@ -3,6 +3,7 @@ using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Toml;
 using SignalNine.Core.Types;
+using Tomlyn;
 
 namespace SignalNine.Core.Services;
 
@@ -77,8 +78,59 @@ public class ConfigService : IConfigService
         await File.WriteAllTextAsync(ConfigPath, toml, cancellationToken).ConfigureAwait(false);
     }
 
+    public TomlValidationResult Validate(string toml)
+    {
+        if (string.IsNullOrWhiteSpace(toml))
+        {
+            return TomlValidationResult.Failure("Configuration must contain TOML text.");
+        }
+
+        try
+        {
+            _ = TomlUtils.Deserialize(toml, SignalNineTomlContext.Default.SignalNineConfig);
+
+            return TomlValidationResult.Success();
+        }
+        catch (TomlException tex)
+        {
+            var (line, column) = ExtractFirstPosition(tex);
+
+            return TomlValidationResult.Failure(tex.Message, line, column);
+        }
+        catch (Exception ex)
+        {
+            return TomlValidationResult.Failure(ex.Message);
+        }
+    }
+
+    public async Task SaveRawAsync(string toml, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(toml);
+
+        var directory = Path.GetDirectoryName(ConfigPath);
+
+        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await File.WriteAllTextAsync(ConfigPath, toml, cancellationToken).ConfigureAwait(false);
+    }
+
     private static bool HasConfigSection(string toml, string sectionName)
         => toml.Contains($"[{sectionName}]", StringComparison.Ordinal) ||
            toml.Contains($"{sectionName}.", StringComparison.Ordinal) ||
            toml.Contains($"{sectionName} =", StringComparison.Ordinal);
+
+    private static (int? Line, int? Column) ExtractFirstPosition(TomlException ex)
+    {
+        if (ex.Diagnostics is not null && ex.Diagnostics.Count > 0)
+        {
+            var first = ex.Diagnostics[0];
+
+            return (first.Span.Start.Line + 1, first.Span.Start.Column + 1);
+        }
+
+        return (null, null);
+    }
 }

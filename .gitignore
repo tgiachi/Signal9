@@ -590,7 +590,7 @@ definitions.lua
 .superpowers/
 .codegraph/
 
-# Vite build artifact (frontend output)
+# Vite build artifact (frontend output) — dir auto-created by MSBuild EnsureWwwroot target
 src/SignalNine.Web/wwwroot/
 
 # Frontend feature directory: do NOT ignore even though "logs" matches Visual Studio rule
