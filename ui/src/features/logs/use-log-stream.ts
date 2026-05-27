@@ -54,6 +54,9 @@ export function useLogStream(opts: Options = {}): Result {
   }, [max]);
 
   const errorCountLastMinute = useMemo(() => {
+    // Intentional: cutoff is "now at memoization time" — recomputed whenever entries change,
+    // which is the desired semantic for an unbounded live stream.
+    // eslint-disable-next-line react-hooks/purity
     const cutoff = Date.now() - 60_000;
     let n = 0;
     for (let i = entries.length - 1; i >= 0; i--) {
