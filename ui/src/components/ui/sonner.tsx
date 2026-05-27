@@ -1,31 +1,24 @@
-"use client"
+import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
-import { useTheme } from "next-themes"
-import { Toaster as Sonner } from "sonner"
-
-type ToasterProps = React.ComponentProps<typeof Sonner>
-
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
+export function Toaster(props: ToasterProps) {
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      theme="dark"
+      position="bottom-right"
       toastOptions={{
         classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-oklch(1 0 0) group-[.toaster]:text-oklch(0.145 0 0) group-[.toaster]:border-oklch(0.922 0 0) group-[.toaster]:shadow-lg dark:group-[.toaster]:bg-oklch(0.145 0 0) dark:group-[.toaster]:text-oklch(0.985 0 0) dark:group-[.toaster]:border-oklch(1 0 0 / 10%)",
-          description: "group-[.toast]:text-oklch(0.556 0 0) dark:group-[.toast]:text-oklch(0.708 0 0)",
-          actionButton:
-            "group-[.toast]:bg-oklch(0.205 0 0) group-[.toast]:text-oklch(0.985 0 0) dark:group-[.toast]:bg-oklch(0.922 0 0) dark:group-[.toast]:text-oklch(0.205 0 0)",
-          cancelButton:
-            "group-[.toast]:bg-oklch(0.97 0 0) group-[.toast]:text-oklch(0.556 0 0) dark:group-[.toast]:bg-oklch(0.269 0 0) dark:group-[.toast]:text-oklch(0.708 0 0)",
+          toast: 'rounded-[6px] bg-bg-4 text-fg-1',
+          title: 'text-[13px] font-semibold',
+          description: 'text-[12px] text-fg-2',
+          success: 'bg-accent-live text-bg-5',
+          error: 'bg-accent-err text-fg-0',
+          warning: 'bg-accent-warn text-bg-0',
+          info: 'bg-accent-jobs text-fg-0',
+          actionButton: 'bg-bg-0 text-fg-1',
+          cancelButton: 'bg-bg-0 text-fg-2',
         },
       }}
       {...props}
     />
-  )
+  );
 }
-
-export { Toaster }
