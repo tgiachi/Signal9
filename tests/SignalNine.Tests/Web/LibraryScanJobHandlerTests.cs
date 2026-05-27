@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
@@ -21,7 +22,16 @@ public class LibraryScanJobHandlerTests
         var libraries = new StubLibraryDataAccess();
         var media = new StubMediaDataAccess();
         var jobs = new StubJobManager();
-        var handler = new LibraryScanJobHandler(jellyfin, walker, libraries, media, jobs);
+
+        var services = new ServiceCollection();
+        services.AddScoped<IJellyfinService>(_ => jellyfin);
+        services.AddScoped<ILocalLibraryWalker>(_ => walker);
+        services.AddScoped<IDataAccess<MediaLibraryEntity>>(_ => libraries);
+        services.AddScoped<IDataAccess<ChannelMediaEntity>>(_ => media);
+        services.AddScoped<IJobManager>(_ => jobs);
+        var sp = services.BuildServiceProvider();
+
+        var handler = new LibraryScanJobHandler(sp.GetRequiredService<IServiceScopeFactory>());
         return (handler, media, libraries, jellyfin, walker, jobs);
     }
 

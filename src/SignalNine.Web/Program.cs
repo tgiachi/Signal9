@@ -61,6 +61,8 @@ builder.Services.AddSingleton<IFfmpegPool>(sp =>
     )
 );
 builder.Services.AddHostedService<FfmpegPoolBroadcastService>();
+builder.Services.AddSingleton<ILocalLibraryWalker, LocalLibraryWalker>();
+builder.Services.AddSingleton<IJobHandler, LibraryScanJobHandler>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);

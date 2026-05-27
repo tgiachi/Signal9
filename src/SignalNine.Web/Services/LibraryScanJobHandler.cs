@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
@@ -15,31 +16,12 @@ public class LibraryScanJobHandler : IJobHandler
     public const string JobType = "library.scan";
     private const int ProgressReportInterval = 10;
 
-    private readonly IJellyfinService _jellyfin;
-    private readonly ILocalLibraryWalker _walker;
-    private readonly IDataAccess<MediaLibraryEntity> _libraries;
-    private readonly IDataAccess<ChannelMediaEntity> _media;
-    private readonly IJobManager _jobs;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public LibraryScanJobHandler(
-        IJellyfinService jellyfin,
-        ILocalLibraryWalker walker,
-        IDataAccess<MediaLibraryEntity> libraries,
-        IDataAccess<ChannelMediaEntity> media,
-        IJobManager jobs
-    )
+    public LibraryScanJobHandler(IServiceScopeFactory scopeFactory)
     {
-        ArgumentNullException.ThrowIfNull(jellyfin);
-        ArgumentNullException.ThrowIfNull(walker);
-        ArgumentNullException.ThrowIfNull(libraries);
-        ArgumentNullException.ThrowIfNull(media);
-        ArgumentNullException.ThrowIfNull(jobs);
-
-        _jellyfin = jellyfin;
-        _walker = walker;
-        _libraries = libraries;
-        _media = media;
-        _jobs = jobs;
+        ArgumentNullException.ThrowIfNull(scopeFactory);
+        _scopeFactory = scopeFactory;
     }
 
     public string Type => JobType;
@@ -51,7 +33,15 @@ public class LibraryScanJobHandler : IJobHandler
         var payload = JsonSerializer.Deserialize<ScanLibraryPayload>(context.PayloadJson)
                       ?? throw new InvalidOperationException("Empty scan payload.");
 
-        var library = _libraries.GetByKey(payload.MediaLibraryId)
+        using var scope = _scopeFactory.CreateScope();
+        var sp = scope.ServiceProvider;
+        var jellyfin = sp.GetRequiredService<IJellyfinService>();
+        var walker = sp.GetRequiredService<ILocalLibraryWalker>();
+        var libraries = sp.GetRequiredService<IDataAccess<MediaLibraryEntity>>();
+        var media = sp.GetRequiredService<IDataAccess<ChannelMediaEntity>>();
+        var jobs = sp.GetRequiredService<IJobManager>();
+
+        var library = libraries.GetByKey(payload.MediaLibraryId)
                       ?? throw new InvalidOperationException($"MediaLibrary {payload.MediaLibraryId} not found.");
 
         if (!library.IsActive)
@@ -64,25 +54,25 @@ public class LibraryScanJobHandler : IJobHandler
         switch (library.SourceType)
         {
             case MediaSourceType.Jellyfin:
-                var items = await _jellyfin.ListItemsAsync(library.SourceRef, cancellationToken).ConfigureAwait(false);
+                var items = await jellyfin.ListItemsAsync(library.SourceRef, cancellationToken).ConfigureAwait(false);
                 var total = items.Count;
                 foreach (var item in items)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    TryUpsertJellyfinItem(library, item, context);
+                    TryUpsertJellyfinItem(media, jobs, library, item, context);
                     processed++;
-                    await MaybeReportProgressAsync(context, processed, total, cancellationToken).ConfigureAwait(false);
+                    await MaybeReportProgressAsync(jobs, context, processed, total, cancellationToken).ConfigureAwait(false);
                 }
                 break;
 
             case MediaSourceType.LocalFile:
-                var localItems = _walker.Walk(library.SourceRef, cancellationToken).ToList();
+                var localItems = walker.Walk(library.SourceRef, cancellationToken).ToList();
                 foreach (var item in localItems)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    TryUpsertLocalItem(library, item, context);
+                    TryUpsertLocalItem(media, jobs, library, item, context);
                     processed++;
-                    await MaybeReportProgressAsync(context, processed, localItems.Count, cancellationToken).ConfigureAwait(false);
+                    await MaybeReportProgressAsync(jobs, context, processed, localItems.Count, cancellationToken).ConfigureAwait(false);
                 }
                 break;
 
@@ -95,56 +85,73 @@ public class LibraryScanJobHandler : IJobHandler
 
         library.LastScannedAt = DateTime.UtcNow;
         library.UpdatedAt = DateTime.UtcNow;
-        _libraries.Update(library);
+        libraries.Update(library);
     }
 
-    private void TryUpsertJellyfinItem(MediaLibraryEntity library, JellyfinItem item, JobExecutionContext context)
+    private static void TryUpsertJellyfinItem(
+        IDataAccess<ChannelMediaEntity> media,
+        IJobManager jobs,
+        MediaLibraryEntity library,
+        JellyfinItem item,
+        JobExecutionContext context
+    )
     {
         try
         {
-            var existing = FindExisting(library.Id, MediaSourceType.Jellyfin, item.Id);
+            var existing = FindExisting(media, library.Id, MediaSourceType.Jellyfin, item.Id);
             if (existing is null)
             {
-                _media.Insert(BuildChannelMediaFromJellyfin(library, item));
+                media.Insert(BuildChannelMediaFromJellyfin(library, item));
             }
             else
             {
                 MutateFromJellyfin(existing, library, item);
-                _media.Update(existing);
+                media.Update(existing);
             }
         }
         catch (Exception ex)
         {
-            _ = _jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
+            _ = jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
                 $"Failed to upsert Jellyfin item {item.Id}: {ex.Message}", CancellationToken.None);
         }
     }
 
-    private void TryUpsertLocalItem(MediaLibraryEntity library, LocalLibraryItem item, JobExecutionContext context)
+    private static void TryUpsertLocalItem(
+        IDataAccess<ChannelMediaEntity> media,
+        IJobManager jobs,
+        MediaLibraryEntity library,
+        LocalLibraryItem item,
+        JobExecutionContext context
+    )
     {
         try
         {
-            var existing = FindExisting(library.Id, MediaSourceType.LocalFile, item.RelativePath);
+            var existing = FindExisting(media, library.Id, MediaSourceType.LocalFile, item.RelativePath);
             if (existing is null)
             {
-                _media.Insert(BuildChannelMediaFromLocal(library, item));
+                media.Insert(BuildChannelMediaFromLocal(library, item));
             }
             else
             {
                 MutateFromLocal(existing, library, item);
-                _media.Update(existing);
+                media.Update(existing);
             }
         }
         catch (Exception ex)
         {
-            _ = _jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
+            _ = jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
                 $"Failed to upsert local file {item.RelativePath}: {ex.Message}", CancellationToken.None);
         }
     }
 
-    private ChannelMediaEntity? FindExisting(Guid mediaLibraryId, MediaSourceType sourceType, string sourceRef)
+    private static ChannelMediaEntity? FindExisting(
+        IDataAccess<ChannelMediaEntity> media,
+        Guid mediaLibraryId,
+        MediaSourceType sourceType,
+        string sourceRef
+    )
     {
-        return _media.List().FirstOrDefault(m =>
+        return media.List().FirstOrDefault(m =>
             m.MediaLibraryId == mediaLibraryId &&
             m.SourceType == sourceType &&
             m.SourceRef == sourceRef);
@@ -222,11 +229,17 @@ public class LibraryScanJobHandler : IJobHandler
         return ticks is null ? null : (int)(ticks.Value / 10_000_000);
     }
 
-    private async Task MaybeReportProgressAsync(JobExecutionContext context, int processed, int total, CancellationToken ct)
+    private static async Task MaybeReportProgressAsync(
+        IJobManager jobs,
+        JobExecutionContext context,
+        int processed,
+        int total,
+        CancellationToken ct
+    )
     {
         if (processed % ProgressReportInterval != 0 && processed != total) return;
 
         var percent = total == 0 ? 100 : Math.Clamp(processed * 100 / total, 0, 100);
-        await _jobs.ReportProgressAsync(context.JobId, percent, $"Processed {processed}/{total}", ct).ConfigureAwait(false);
+        await jobs.ReportProgressAsync(context.JobId, percent, $"Processed {processed}/{total}", ct).ConfigureAwait(false);
     }
 }
