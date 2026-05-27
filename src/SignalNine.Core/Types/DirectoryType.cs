@@ -24,5 +24,8 @@ public enum DirectoryType
     TvShows,
 
     /// <summary>Directory for storing movie media.</summary>
-    Movies
+    Movies,
+
+    /// <summary>Directory for uploaded assets (logos, future thumbnails, …).</summary>
+    Assets
 }
