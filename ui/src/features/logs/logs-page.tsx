@@ -24,15 +24,15 @@ export function LogsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col p-3">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-panel">
-        <header className="flex items-center gap-3 border-b border-border-subtle bg-panel-strong px-3 py-2">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] bg-bg-2">
+        <header className="flex items-center gap-3 bg-bg-4 px-3 py-2">
           <div className="min-w-0">
             <h1 className="text-sm font-semibold text-fg-0">Live Log Stream</h1>
-            <p className="font-mono text-[10px] text-fg-2">
+            <p className="font-mono text-[10px] text-fg-3">
               {filtered.length} visible / {entries.length} retained
             </p>
           </div>
-          <span className="ml-auto rounded border border-border bg-bg-1 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-fg-1">
+          <span className="ml-auto rounded-[3px] bg-bg-2 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-fg-2">
             {connection}
           </span>
         </header>
@@ -43,17 +43,17 @@ export function LogsPage() {
           onSearchChange={setSearch}
         />
         {connection === 'reconnecting' && (
-          <div className="border-b border-warn/40 bg-warn/10 px-3 py-1 text-[11px] text-warn">
+          <div className="bg-accent-warn px-3 py-1 text-[11px] text-bg-0">
             Reconnecting…
           </div>
         )}
         {connection === 'disconnected' && (
-          <div className="flex items-center gap-3 border-b border-error/40 bg-error-bg/30 px-3 py-1 text-[11px] text-error">
+          <div className="flex items-center gap-3 bg-accent-err px-3 py-1 text-[11px] text-fg-0">
             <span>Disconnected from log hub.</span>
             <button
               type="button"
               onClick={reconnect}
-              className="rounded border border-error/60 px-2 py-0.5 text-error hover:bg-error-bg"
+              className="rounded-[3px] bg-bg-5 px-2 py-0.5 text-fg-0 hover:opacity-90"
             >
               Retry now
             </button>
@@ -62,7 +62,7 @@ export function LogsPage() {
         <div className="min-h-0 flex-1">
           <LogStream entries={filtered} />
         </div>
-        <footer className="flex items-center justify-between border-t border-border-subtle bg-panel-strong px-3 py-1 font-mono text-[10px] text-fg-2">
+        <footer className="flex items-center justify-between bg-bg-4 px-3 py-1 font-mono text-[10px] text-fg-3">
           <span>{entries.length >= 2000 ? '2000+' : entries.length} entries</span>
           <span>SignalR logs hub</span>
         </footer>

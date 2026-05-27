@@ -19,7 +19,7 @@ describe('LogRow', () => {
     render(<LogRow entry={make('error')} />);
     const lvl = screen.getByTestId('log-lvl');
     expect(lvl).toHaveTextContent('ERROR');
-    expect(lvl).toHaveClass('text-error');
+    expect(lvl).toHaveClass('text-accent-err');
   });
   it('renders source and message', () => {
     render(<LogRow entry={make('warn')} />);

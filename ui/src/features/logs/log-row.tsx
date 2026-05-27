@@ -2,10 +2,10 @@ import type { LogEntry } from './log-entry';
 import { cn } from '@/lib/cn';
 
 const LEVEL_CLS: Record<LogEntry['level'], string> = {
-  debug: 'text-fg-2',
-  info: 'text-on-air-2',
-  warn: 'text-warn',
-  error: 'text-error',
+  debug: 'text-fg-3',
+  info: 'text-accent-live',
+  warn: 'text-accent-warn',
+  error: 'text-accent-err',
 };
 
 function formatTime(iso: string): string {
@@ -15,8 +15,8 @@ function formatTime(iso: string): string {
 
 export function LogRow({ entry }: { entry: LogEntry }) {
   return (
-    <div className="grid grid-cols-[5.5rem_4rem_minmax(6rem,10rem)_minmax(0,1fr)] gap-3 border-b border-border-subtle/50 px-3 py-1 font-mono text-[12px] leading-[1.45] hover:bg-bg-2">
-      <span data-testid="log-ts" className="shrink-0 text-fg-2">
+    <div className="grid grid-cols-[5.5rem_4rem_minmax(6rem,10rem)_minmax(0,1fr)] gap-3 px-3 py-1 font-mono text-[12px] leading-[1.45] hover:bg-[#343b41]">
+      <span data-testid="log-ts" className="shrink-0 text-fg-3">
         {formatTime(entry.ts)}
       </span>
       <span
@@ -25,7 +25,7 @@ export function LogRow({ entry }: { entry: LogEntry }) {
       >
         {entry.level.toUpperCase()}
       </span>
-      <span className="truncate text-[color:var(--syn-key)]">{entry.source}</span>
+      <span className="truncate text-accent-jobs">{entry.source}</span>
       <span className="min-w-0 break-words text-fg-0">{entry.message}</span>
     </div>
   );
