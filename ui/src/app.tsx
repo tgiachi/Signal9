@@ -1,7 +1,19 @@
+import { RouterProvider } from 'react-router';
+import { Toaster } from 'sonner';
+import { router } from './routes';
+import { QueryProvider } from './providers/query-provider';
+import { ThemeProvider } from './providers/theme-provider';
+import { AuthProvider } from './providers/auth-provider';
+
 export default function App() {
   return (
-    <div className="p-4 text-fg-0">
-      <h1 className="font-mono text-on-air-2">SignalNine UI</h1>
-    </div>
+    <ThemeProvider>
+      <QueryProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+          <Toaster position="bottom-right" theme="dark" richColors />
+        </AuthProvider>
+      </QueryProvider>
+    </ThemeProvider>
   );
 }
