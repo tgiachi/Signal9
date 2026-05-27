@@ -17,6 +17,7 @@ using SignalNine.Web.Services;
 const string SwaggerBearerSchemeName = "Bearer";
 const string SwaggerDocumentName = "v1";
 const string SwaggerTitle = "SignalNine API";
+const string JobsHubPathPrefix = "/hubs/jobs";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +47,7 @@ builder.Services.AddSingleton(freeSqlFactory);
 builder.Services.AddSingleton(freeSql);
 builder.Services.AddScoped(typeof(IDataAccess<>), typeof(FreeSqlDataAccess<>));
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
+builder.Services.AddScoped<DefaultUserSeeder>();
 builder.Services.AddHostedService<JobWorkerService>();
 builder.Services.AddHostedService<LogsBroadcastService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -53,6 +55,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
            options =>
            {
                options.TokenValidationParameters = JwtTokenService.CreateTokenValidationParameters(signalNineConfig.Jwt);
+               options.Events = new JwtBearerEvents
+               {
+                   OnMessageReceived = context =>
+                   {
+                       var accessToken = context.Request.Query["access_token"].ToString();
+                       var path = context.HttpContext.Request.Path;
+
+                       if (!string.IsNullOrWhiteSpace(accessToken) && path.StartsWithSegments(JobsHubPathPrefix))
+                       {
+                           context.Token = accessToken;
+                       }
+
+                       return Task.CompletedTask;
+                   }
+               };
            }
        );
 builder.Services.AddAuthorization();
@@ -98,6 +115,12 @@ builder.Services.AddSwaggerGen(
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var defaultUserSeeder = scope.ServiceProvider.GetRequiredService<DefaultUserSeeder>();
+    defaultUserSeeder.Seed();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -125,6 +148,9 @@ app.MapHealthChecks("/health")
    .AllowAnonymous();
 app.MapAuthenticationEndpoints();
 app.MapConfigEndpoints();
+app.MapChannelEndpoints();
+app.MapChannelMediaEndpoints();
+app.MapTagEndpoints();
 app.MapJobEndpoints();
 app.MapHub<JobStatusHub>("/hubs/jobs/status")
    .RequireAuthorization();
