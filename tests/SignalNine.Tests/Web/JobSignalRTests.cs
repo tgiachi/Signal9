@@ -1,10 +1,12 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Interfaces;
+using SignalNine.Core.Types;
 using SignalNine.Tests.Support.Jobs;
 using SignalNine.Tests.Support.Web;
 using SignalNine.Web.Data.Jobs;
@@ -42,6 +44,56 @@ public class JobSignalRTests : IDisposable
                            );
                        }
                    );
+    }
+
+    [Fact]
+    public async Task StatusHub_EnqueueJob_QueuesJobAndReturnsStatus()
+    {
+        var receivedStatus = new TaskCompletionSource<JobResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var connection = CreateConnection("/hubs/jobs/status");
+        connection.On<JobResponse>(
+            "JobStatusChanged",
+            response =>
+            {
+                if (response.Type == TestJobType)
+                {
+                    receivedStatus.TrySetResult(response);
+                }
+            }
+        );
+        await connection.StartAsync();
+
+        var createdJob = await connection.InvokeAsync<JobResponse>("EnqueueJob", CreateRequest());
+        var status = await receivedStatus.Task.WaitAsync(TestTimeout);
+
+        Assert.Equal(createdJob.Id, status.Id);
+        Assert.Equal(TestJobType, createdJob.Type);
+        Assert.NotEqual(Guid.Empty, createdJob.Id);
+    }
+
+    [Fact]
+    public async Task StatusHub_CancelJob_CancelsJobAndPublishesStatus()
+    {
+        var receivedStatus = new TaskCompletionSource<JobResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var connection = CreateConnection("/hubs/jobs/status");
+        connection.On<JobResponse>(
+            "JobStatusChanged",
+            response =>
+            {
+                if (response.State == JobStateType.Canceled)
+                {
+                    receivedStatus.TrySetResult(response);
+                }
+            }
+        );
+        await connection.StartAsync();
+        var createdJob = await connection.InvokeAsync<JobResponse>("EnqueueJob", CreateRequest());
+
+        var canceled = await connection.InvokeAsync<bool>("CancelJob", createdJob.Id);
+        var status = await receivedStatus.Task.WaitAsync(TestTimeout);
+
+        Assert.True(canceled);
+        Assert.Equal(createdJob.Id, status.Id);
     }
 
     [Fact]
@@ -124,6 +176,18 @@ public class JobSignalRTests : IDisposable
 
         return job;
     }
+
+    private static EnqueueJobRequest CreateRequest()
+        => new()
+        {
+            Type = TestJobType,
+            Payload = JsonSerializer.SerializeToElement(
+                new
+                {
+                    Name = "first"
+                }
+            )
+        };
 
     public void Dispose()
     {
