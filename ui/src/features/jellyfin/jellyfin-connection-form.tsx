@@ -48,7 +48,7 @@ export function JellyfinConnectionForm({ status, isSaving, onSubmit }: Props) {
       {error && (
         <div
           role="alert"
-          className="rounded-md border border-error/40 bg-error-bg/50 px-3 py-2 text-[12px] text-error"
+          className="rounded-[6px] bg-accent-err px-3 py-2 text-[12px] text-fg-0"
         >
           {error}
         </div>
@@ -56,7 +56,7 @@ export function JellyfinConnectionForm({ status, isSaving, onSubmit }: Props) {
 
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block">
-          <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+          <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
             Base URL
           </span>
           <input
@@ -64,11 +64,11 @@ export function JellyfinConnectionForm({ status, isSaving, onSubmit }: Props) {
             name="baseUrl"
             defaultValue={status.baseUrl ?? ''}
             placeholder="http://jellyfin.local:8096"
-            className="mt-1 w-full rounded-md border border-border bg-bg-1 px-2.5 py-2 text-[12px] text-fg-0 outline-none transition placeholder:text-fg-2 focus:border-on-air"
+            className="mt-1 w-full rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
           />
         </label>
         <label className="block">
-          <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+          <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
             API key
           </span>
           <input
@@ -76,19 +76,19 @@ export function JellyfinConnectionForm({ status, isSaving, onSubmit }: Props) {
             type="password"
             autoComplete="new-password"
             placeholder={status.isConfigured ? 'Paste a new API key to replace it' : 'API key'}
-            className="mt-1 w-full rounded-md border border-border bg-bg-1 px-2.5 py-2 text-[12px] text-fg-0 outline-none transition placeholder:text-fg-2 focus:border-on-air"
+            className="mt-1 w-full rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
           />
         </label>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+        <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">
           {dirty ? 'Unsaved changes' : 'No pending changes'}
         </div>
         <button
           type="submit"
           disabled={isSaving || !dirty}
-          className="inline-flex items-center justify-center gap-2 rounded-md border border-on-air/50 bg-on-air/15 px-3 py-2 text-sm font-semibold text-on-air-2 transition hover:bg-on-air/20 disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-accent-live px-3 py-2 text-sm font-semibold text-bg-5 transition hover:bg-accent-live-hover disabled:opacity-40"
         >
           <Save className="size-4" />
           {isSaving ? 'Saving' : 'Save'}
