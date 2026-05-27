@@ -38,10 +38,10 @@ export function JobsPage() {
   if (!jobs.authenticated) {
     return (
       <div className="flex h-full items-center justify-center p-6">
-        <div className="max-w-md rounded-lg border border-border bg-panel p-5 text-center">
-          <ShieldAlert className="mx-auto mb-3 size-8 text-warn" />
+        <div className="max-w-md rounded-[6px] bg-bg-2 p-5 text-center">
+          <ShieldAlert className="mx-auto mb-3 size-8 text-accent-warn" />
           <h1 className="text-base font-semibold text-fg-0">JWT session required</h1>
-          <p className="mt-2 text-sm text-fg-1">
+          <p className="mt-2 text-sm text-fg-2">
             Job endpoints and job SignalR hubs require an authenticated session.
           </p>
         </div>
@@ -60,48 +60,48 @@ export function JobsPage() {
         isCanceling={jobs.isCanceling}
       />
       <aside className="flex min-h-0 flex-col gap-3">
-        <section className="rounded-lg border border-border bg-panel">
-          <header className="flex items-center gap-2 border-b border-border-subtle bg-panel-strong px-3 py-2">
-            <Plus className="size-4 text-on-air-2" />
-            <h2 className="text-sm font-semibold">Enqueue Job</h2>
+        <section className="overflow-hidden rounded-[6px] bg-bg-2">
+          <header className="flex items-center gap-2 bg-bg-4 px-3 py-2">
+            <Plus className="size-4 text-accent-live" />
+            <h2 className="text-sm font-semibold text-fg-0">Enqueue Job</h2>
           </header>
           <div className="space-y-3 p-3">
             <label className="block">
-              <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+              <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
                 Type
               </span>
               <input
                 value={type}
                 onChange={(event) => setType(event.target.value)}
-                className="mt-1 w-full rounded border border-border bg-bg-1 px-2 py-1.5 font-mono text-[12px] outline-none focus:border-on-air"
+                className="mt-1 w-full rounded-[6px] bg-bg-1 px-2 py-1.5 font-mono text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
               />
             </label>
             <label className="block">
-              <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+              <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
                 Payload JSON
               </span>
               <textarea
                 value={payload}
                 onChange={(event) => setPayload(event.target.value)}
                 rows={9}
-                className="mt-1 w-full resize-none rounded border border-border bg-bg-1 px-2 py-1.5 font-mono text-[12px] outline-none focus:border-on-air"
+                className="mt-1 w-full resize-none rounded-[6px] bg-bg-1 px-2 py-1.5 font-mono text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
               />
             </label>
             <button
               type="button"
               onClick={enqueue}
               disabled={!type.trim() || jobs.isEnqueueing}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-on-air/50 bg-on-air/15 px-3 py-2 text-sm font-semibold text-on-air-2 transition hover:bg-on-air/20 disabled:opacity-40"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[6px] bg-accent-live px-3 py-2 text-sm font-semibold text-bg-5 transition hover:bg-accent-live-hover disabled:opacity-40"
             >
               <Plus className="size-4" />
               {jobs.isEnqueueing ? 'Enqueueing' : 'Enqueue'}
             </button>
           </div>
         </section>
-        <section className="rounded-lg border border-border bg-panel p-3">
+        <section className="rounded-[6px] bg-bg-2 p-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">SignalR</h2>
-            <span className="rounded border border-border bg-bg-2 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-fg-1">
+            <h2 className="text-sm font-semibold text-fg-0">SignalR</h2>
+            <span className="rounded-[3px] bg-bg-4 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-fg-2">
               {jobs.connection}
             </span>
           </div>
@@ -112,7 +112,7 @@ export function JobsPage() {
             <Metric label="Failed" value={jobs.counts.failed} />
           </div>
           {jobs.isError && (
-            <div className="mt-3 flex items-center gap-2 rounded border border-error/40 bg-error-bg/40 px-2 py-2 text-[11px] text-error">
+            <div className="mt-3 flex items-center gap-2 rounded-[6px] bg-accent-err px-2 py-2 text-[11px] text-fg-0">
               <RefreshCw className="size-3.5" />
               {errorMessage(jobs.error)}
             </div>
@@ -125,8 +125,8 @@ export function JobsPage() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded border border-border-subtle bg-bg-1 px-2 py-2">
-      <div className="text-fg-2">{label}</div>
+    <div className="rounded-[6px] bg-bg-3 px-2 py-2">
+      <div className="text-fg-3">{label}</div>
       <div className="text-base font-semibold text-fg-0">{value}</div>
     </div>
   );

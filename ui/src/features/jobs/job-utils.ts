@@ -25,15 +25,15 @@ export function formatElapsed(job: JobResponse): string {
 export function stateClass(state: JobState): string {
   switch (state) {
     case 'running':
-      return 'border-on-air/40 bg-on-air/10 text-on-air-2';
+      return 'bg-accent-jobs text-fg-0';
     case 'queued':
-      return 'border-cyan/40 bg-cyan/10 text-cyan';
+      return 'bg-accent-cfg text-fg-0';
     case 'completed':
-      return 'border-border bg-bg-3 text-fg-1';
+      return 'bg-accent-live text-bg-5';
     case 'failed':
-      return 'border-error/50 bg-error-bg/60 text-error';
+      return 'bg-accent-err text-fg-0';
     case 'canceled':
-      return 'border-warn/40 bg-warn/10 text-warn';
+      return 'bg-accent-warn text-bg-0';
   }
 }
 
@@ -49,11 +49,11 @@ export function modelForJob(job: JobResponse): 'Spark' | 'Standard' | 'Deep' {
 export function modelClass(model: 'Spark' | 'Standard' | 'Deep'): string {
   switch (model) {
     case 'Spark':
-      return 'border-on-air/40 bg-on-air/10 text-on-air-2';
+      return 'bg-accent-live text-bg-5';
     case 'Standard':
-      return 'border-cyan/40 bg-cyan/10 text-cyan';
+      return 'bg-accent-jobs text-fg-0';
     case 'Deep':
-      return 'border-violet/40 bg-violet/10 text-violet';
+      return 'bg-accent-cfg text-fg-0';
   }
 }
 
