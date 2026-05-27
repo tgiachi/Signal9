@@ -7,7 +7,7 @@ describe('StatusBar', () => {
     render(<StatusBar connection="connected" configOk errorCount={0} />);
     const pill = screen.getByTestId('pill-live');
     expect(pill).toHaveTextContent(/ON AIR/);
-    expect(pill).toHaveClass('text-on-air-2');
+    expect(pill).toHaveClass('bg-accent-live');
   });
 
   it('renders the error pill with count when errors > 0', () => {

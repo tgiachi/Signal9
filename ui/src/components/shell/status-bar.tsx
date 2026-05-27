@@ -1,9 +1,11 @@
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { KeyRound, LogOut, RadioTower } from 'lucide-react';
 import { toast } from 'sonner';
 import type { EndpointStatus } from '@/lib/health';
 import { useAuth } from '@/providers/auth-context';
-import { cn } from '@/lib/cn';
+import { Pill, type PillVariant } from '@/components/ui/pill';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export type ConnectionState = 'connected' | 'reconnecting' | 'disconnected';
 
@@ -16,12 +18,6 @@ type Props = {
   errorCount: number;
   runningJobs?: number;
   maxConcurrentJobs?: number;
-};
-
-const LIVE_PILL: Record<ConnectionState, { label: string; cls: string }> = {
-  connected: { label: 'ON AIR', cls: 'border-on-air/50 bg-on-air/15 text-on-air-2' },
-  reconnecting: { label: 'RECONNECT', cls: 'border-warn/50 bg-warn/10 text-warn animate-pulse' },
-  disconnected: { label: 'OFFLINE', cls: 'border-error/50 bg-error-bg/50 text-error' },
 };
 
 export function StatusBar({
@@ -38,7 +34,15 @@ export function StatusBar({
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const livePill = LIVE_PILL[connection];
+
+  const liveLabel =
+    connection === 'connected'
+      ? 'ON AIR'
+      : connection === 'reconnecting'
+        ? 'RECONNECT'
+        : 'OFFLINE';
+  const liveVariant: PillVariant =
+    connection === 'connected' ? 'live' : connection === 'reconnecting' ? 'warn' : 'err';
 
   const login = async () => {
     setIsLoggingIn(true);
@@ -54,54 +58,42 @@ export function StatusBar({
   };
 
   return (
-    <header className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border bg-bg-2 px-3 py-2 text-xs">
-      <div className="mr-2 flex items-center gap-2 font-semibold tracking-[0.12em] text-fg-0 md:hidden">
-        <RadioTower className="size-4 text-on-air-2" />
+    <header className="flex min-h-10 flex-wrap items-center gap-1.5 bg-bg-1 px-4 py-2">
+      <div className="mr-2 flex items-center gap-2 text-[12px] font-bold tracking-brand text-fg-1 md:hidden">
+        <RadioTower className="size-4 text-accent-live" />
         SIGNALNINE
       </div>
-      <Pill testId="pill-live" className={livePill.cls}>
-        {livePill.label}
+      <Pill data-testid="pill-live" variant={liveVariant} dot>
+        {liveLabel}
       </Pill>
-      <Pill className={statusClass(health)}>/health {health}</Pill>
-      <Pill className={statusClass(live)}>/live {live}</Pill>
-      <Pill
-        className={
-          auth.authenticated
-            ? statusClass(jobsConnection)
-            : 'border-warn/40 bg-warn/10 text-warn'
-        }
-      >
+      <Pill variant={endpointVariant(health)}>/health {health}</Pill>
+      <Pill variant={endpointVariant(live)}>/live {live}</Pill>
+      <Pill variant={auth.authenticated ? endpointVariant(jobsConnection) : 'warn'}>
         {auth.authenticated ? `jobs ${runningJobs}/${maxConcurrentJobs}` : 'jobs locked'}
       </Pill>
-      <Pill
-        testId="pill-cfg"
-        className={
-          configOk
-            ? 'border-border bg-bg-3 text-fg-1'
-            : 'border-warn/50 bg-warn/10 text-warn'
-        }
-      >
-        {configOk ? 'config synced' : 'config dirty'}
+      <Pill data-testid="pill-cfg" variant={configOk ? 'cfg' : 'warn'}>
+        {configOk ? 'config sync' : 'config dirty'}
       </Pill>
       {errorCount > 0 && (
-        <Pill testId="pill-err" className="border-error/50 bg-error-bg/60 text-error">
+        <Pill data-testid="pill-err" variant="err">
           {errorCount} err
         </Pill>
       )}
       <div className="ml-auto flex min-w-0 items-center gap-2">
         {auth.authenticated ? (
           <>
-            <span className="max-w-36 truncate rounded border border-border bg-bg-1 px-2 py-1 font-mono text-[10px] text-fg-1">
-              JWT {auth.user?.username ?? 'session'}
+            <span className="max-w-36 truncate rounded-[4px] bg-bg-2 px-2 py-1 font-mono text-[10px] text-fg-2">
+              JWT · {auth.user?.username ?? 'session'}
             </span>
-            <button
+            <Button
               type="button"
               onClick={auth.logout}
-              className="flex size-7 items-center justify-center rounded border border-border bg-bg-1 text-fg-1 hover:text-fg-0"
-              title="Log out"
+              variant="icon"
+              size="icon"
+              aria-label="Log out"
             >
-              <LogOut className="size-3.5" />
-            </button>
+              <LogOut />
+            </Button>
           </>
         ) : (
           <form
@@ -111,27 +103,29 @@ export function StatusBar({
               void login();
             }}
           >
-            <input
+            <Input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              className="h-7 w-24 rounded border border-border bg-bg-1 px-2 font-mono text-[11px] outline-none focus:border-on-air max-sm:flex-1"
+              className="h-7 w-24 px-2 font-mono text-[11px] max-sm:flex-1"
               placeholder="user"
             />
-            <input
+            <Input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"
-              className="h-7 w-28 rounded border border-border bg-bg-1 px-2 font-mono text-[11px] outline-none focus:border-on-air max-sm:flex-1"
+              className="h-7 w-28 px-2 font-mono text-[11px] max-sm:flex-1"
               placeholder="password"
             />
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              size="sm"
               disabled={isLoggingIn || !username.trim() || !password}
-              className="flex h-7 items-center gap-1 rounded border border-on-air/40 bg-on-air/10 px-2 font-mono text-[10px] uppercase tracking-label text-on-air-2 hover:bg-on-air/20 disabled:opacity-40"
+              className="h-7"
             >
-              <KeyRound className="size-3" />
+              <KeyRound />
               Login
-            </button>
+            </Button>
           </form>
         )}
       </div>
@@ -139,31 +133,8 @@ export function StatusBar({
   );
 }
 
-function Pill({
-  children,
-  className,
-  testId,
-}: {
-  children: ReactNode;
-  className: string;
-  testId?: string;
-}) {
-  return (
-    <span
-      data-testid={testId}
-      className={cn('rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-label', className)}
-    >
-      {children}
-    </span>
-  );
-}
-
-function statusClass(status: EndpointStatus | ConnectionState): string {
-  if (status === 'ok' || status === 'connected') {
-    return 'border-on-air/40 bg-on-air/10 text-on-air-2';
-  }
-  if (status === 'reconnecting' || status === 'unknown') {
-    return 'border-warn/40 bg-warn/10 text-warn';
-  }
-  return 'border-error/50 bg-error-bg/60 text-error';
+function endpointVariant(status: EndpointStatus | ConnectionState): PillVariant {
+  if (status === 'ok' || status === 'connected') return 'live';
+  if (status === 'reconnecting' || status === 'unknown') return 'warn';
+  return 'err';
 }
