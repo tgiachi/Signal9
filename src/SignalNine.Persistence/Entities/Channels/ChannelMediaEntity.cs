@@ -42,6 +42,8 @@ public class ChannelMediaEntity
     // Information
     [Column(StringLength = 64)] public string? InformationEdition { get; set; }
 
+    public Guid? MediaLibraryId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
