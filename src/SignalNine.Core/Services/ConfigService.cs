@@ -49,8 +49,15 @@ public class ConfigService : IConfigService
             updated = true;
         }
 
+        if (config.FfmpegPool is null)
+        {
+            config.FfmpegPool = new FfmpegPoolConfig();
+            updated = true;
+        }
+
         if (!HasConfigSection(toml, nameof(SignalNineConfig.Jwt)) ||
-            !HasConfigSection(toml, nameof(SignalNineConfig.JobSystem)))
+            !HasConfigSection(toml, nameof(SignalNineConfig.JobSystem)) ||
+            !HasConfigSection(toml, nameof(SignalNineConfig.FfmpegPool)))
         {
             updated = true;
         }

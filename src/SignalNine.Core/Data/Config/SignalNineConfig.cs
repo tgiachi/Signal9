@@ -15,4 +15,6 @@ public class SignalNineConfig
     public JwtConfig Jwt { get; set; } = new();
 
     public JobSystemConfig JobSystem { get; set; } = new();
+
+    public FfmpegPoolConfig FfmpegPool { get; set; } = new();
 }
