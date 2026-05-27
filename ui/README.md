@@ -1,73 +1,54 @@
-# React + TypeScript + Vite
+# SignalNine UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vite + React + TS frontend for the SignalNine operator console (Broadcast Control Room theme). Build output goes to `../src/SignalNine.Web/wwwroot/` (gitignored), served statically by ASP.NET in production.
 
-Currently, two official plugins are available:
+## Develop
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Against real backend on `:5001`:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
+# http://localhost:5173 — proxies /api and /hub to :5001
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+In isolation (no backend running):
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev:mocks
+# MSW + mock SignalR drive the UI from fixtures
 ```
+
+## Build
+
+```bash
+npm run build
+# Outputs to ../src/SignalNine.Web/wwwroot/
+```
+
+## Test / quality
+
+```bash
+npm test            # vitest run
+npm run test:watch  # vitest watch
+npm run typecheck
+npm run lint
+npm run format
+```
+
+## Backend contract (assumption — not implemented in this repo)
+
+- `GET /api/config` → `200 text/plain` raw TOML
+- `POST /api/config` → `text/plain` body; `200` ok / `422 { message, line?, column? }`
+- `/hub/logs` SignalR → server invokes client method `log(entry)` with `LogEntry` shape:
+  ```ts
+  type LogEntry = {
+    ts: string;            // ISO 8601
+    level: 'debug' | 'info' | 'warn' | 'error';
+    source: string;
+    message: string;
+    props?: Record<string, unknown>;
+  };
+  ```
+
+The backend team adds `app.UseDefaultFiles().UseStaticFiles()` to `Program.cs` (one line) when the SPA is ready to serve.
