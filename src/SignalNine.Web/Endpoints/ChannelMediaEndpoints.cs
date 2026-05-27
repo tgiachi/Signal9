@@ -1,8 +1,13 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
+using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Pipeline;
+using SignalNine.Core.Interfaces;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
 using SignalNine.Web.Data.Channels;
+using SignalNine.Web.Data.Jobs;
 
 namespace SignalNine.Web.Endpoints;
 
@@ -23,6 +28,8 @@ public static class ChannelMediaEndpoints
 
         group.MapPost("/{id:guid}/tags/{tagId:guid}", AttachTag);
         group.MapDelete("/{id:guid}/tags/{tagId:guid}", DetachTag);
+
+        group.MapPost("/{id:guid}/pipeline", Pipeline);
 
         return app;
     }
@@ -168,6 +175,51 @@ public static class ChannelMediaEndpoints
 
         joinAccess.Delete(join.Id);
         return TypedResults.NoContent();
+    }
+
+    // MediaPipelineJobHandler.JobType — kept as literal here to avoid a tight coupling.
+    private const string PipelineJobType = "media.pipeline";
+
+    private static async Task<Results<Accepted<JobResponse>, NotFound, Conflict<string>>> Pipeline(
+        Guid id,
+        IDataAccess<ChannelMediaEntity> dataAccess,
+        IJobManager jobs,
+        CancellationToken ct
+    )
+    {
+        var media = dataAccess.GetByKey(id);
+        if (media is null)
+        {
+            return TypedResults.NotFound();
+        }
+        if (!media.IsActive)
+        {
+            return TypedResults.Conflict("Media is inactive.");
+        }
+
+        var payload = JsonSerializer.Serialize(new MediaPipelinePayload(id));
+        var snapshot = await jobs.EnqueueAsync(new EnqueueJobCommand
+        {
+            Type = PipelineJobType,
+            PayloadJson = payload
+        }, ct);
+
+        return TypedResults.Accepted($"/api/jobs/{snapshot.Id}", ToJobResponse(snapshot));
+    }
+
+    private static JobResponse ToJobResponse(JobSnapshot job)
+    {
+        return new(
+            job.Id,
+            job.Type,
+            job.State,
+            job.Progress.Percent,
+            job.Progress.Message,
+            job.Error,
+            job.CreatedAt,
+            job.StartedAt,
+            job.FinishedAt
+        );
     }
 
     private static ChannelMediaResponse ToResponse(ChannelMediaEntity e) =>
