@@ -70,7 +70,10 @@ public class JellyfinService : IJellyfinService
             dto.Type ?? "",
             dto.RunTimeTicks,
             dto.ProductionYear,
-            dto.Overview
+            dto.Overview,
+            dto.SeriesName,
+            dto.ParentIndexNumber,
+            dto.IndexNumber
         );
     }
 
@@ -156,5 +159,8 @@ public class JellyfinService : IJellyfinService
         public long? RunTimeTicks { get; set; }
         public int? ProductionYear { get; set; }
         public string? Overview { get; set; }
+        public string? SeriesName { get; set; }
+        public int? ParentIndexNumber { get; set; }
+        public int? IndexNumber { get; set; }
     }
 }

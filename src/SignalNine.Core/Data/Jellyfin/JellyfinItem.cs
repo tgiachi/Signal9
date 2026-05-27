@@ -6,5 +6,8 @@ public record JellyfinItem(
     string Type,
     long? RunTimeTicks,
     int? ProductionYear,
-    string? Overview
+    string? Overview,
+    string? SeriesName,
+    int? ParentIndexNumber,
+    int? IndexNumber
 );
