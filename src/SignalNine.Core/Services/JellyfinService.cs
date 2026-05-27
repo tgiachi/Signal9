@@ -77,6 +77,53 @@ public class JellyfinService : IJellyfinService
         );
     }
 
+    public async Task<IReadOnlyList<JellyfinItem>> ListItemsAsync(string libraryId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(libraryId);
+
+        const int pageSize = 500;
+        var all = new List<JellyfinItem>();
+        var start = 0;
+        int? total = null;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var path =
+                $"Items?ParentId={Uri.EscapeDataString(libraryId)}" +
+                "&Recursive=true" +
+                "&Fields=Overview,RunTimeTicks,ProductionYear,SeriesName,ParentIndexNumber,IndexNumber" +
+                $"&StartIndex={start}" +
+                $"&Limit={pageSize}";
+
+            var page = await GetAsync<ItemsResultDto>(path, ct).ConfigureAwait(false);
+            if (page?.Items is null || page.Items.Count == 0) break;
+
+            foreach (var dto in page.Items)
+            {
+                all.Add(new JellyfinItem(
+                    dto.Id ?? "",
+                    dto.Name ?? "",
+                    dto.Type ?? "",
+                    dto.RunTimeTicks,
+                    dto.ProductionYear,
+                    dto.Overview,
+                    dto.SeriesName,
+                    dto.ParentIndexNumber,
+                    dto.IndexNumber
+                ));
+            }
+
+            total ??= page.TotalRecordCount ?? all.Count;
+            start += page.Items.Count;
+
+            if (start >= total) break;
+        }
+
+        return all;
+    }
+
     private async Task<T?> GetAsync<T>(string relativePath, CancellationToken ct, bool allowNotFound = false)
     {
         var creds = await ResolveCredentialsAsync(ct).ConfigureAwait(false);
@@ -148,6 +195,7 @@ public class JellyfinService : IJellyfinService
     private sealed class ItemsResultDto
     {
         public List<ItemDto>? Items { get; set; }
+        public int? TotalRecordCount { get; set; }
     }
 
     private sealed class ItemDto

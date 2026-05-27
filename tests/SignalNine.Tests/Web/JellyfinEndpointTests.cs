@@ -199,5 +199,10 @@ public class JellyfinEndpointTests : IDisposable
         {
             return Task.FromResult<JellyfinItem?>(null);
         }
+
+        public Task<IReadOnlyList<JellyfinItem>> ListItemsAsync(string libraryId, CancellationToken ct = default)
+        {
+            return Task.FromResult<IReadOnlyList<JellyfinItem>>(Array.Empty<JellyfinItem>());
+        }
     }
 }
