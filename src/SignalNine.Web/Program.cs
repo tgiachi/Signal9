@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi;
 using Serilog;
+using SignalNine.Core.Data.Config;
 using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services;
@@ -15,6 +16,7 @@ using SignalNine.Persistence.Services;
 using SignalNine.Web.Endpoints;
 using SignalNine.Web.Hubs;
 using SignalNine.Web.Services;
+using SignalNine.Core.Services.Ffmpeg;
 
 const string SwaggerBearerSchemeName = "Bearer";
 const string SwaggerDocumentName = "v1";
@@ -51,6 +53,14 @@ builder.Services.AddScoped<IJellyfinService, JellyfinService>();
 builder.Services.AddDataProtection();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient("jellyfin", c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddSingleton<IProcessLauncher, DefaultProcessLauncher>();
+builder.Services.AddSingleton<IFfmpegPool>(sp =>
+    new FfmpegPool(
+        sp.GetRequiredService<IProcessLauncher>(),
+        sp.GetRequiredService<SignalNineConfig>().FfmpegPool
+    )
+);
+builder.Services.AddHostedService<FfmpegPoolBroadcastService>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
@@ -185,5 +195,7 @@ app.MapHub<JobLogHub>("/hubs/jobs/logs")
    .RequireAuthorization();
 app.MapHub<LogsHub>("/hubs/logs")
    .AllowAnonymous();
+app.MapFfmpegPoolEndpoints();
+app.MapHub<FfmpegPoolHub>("/hubs/ffmpeg").RequireAuthorization();
 
 app.Run();
