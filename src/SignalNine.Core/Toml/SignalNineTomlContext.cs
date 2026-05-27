@@ -7,6 +7,7 @@ namespace SignalNine.Core.Toml;
 [TomlSerializable(typeof(FfmpegPoolConfig))]
 [TomlSerializable(typeof(JobSystemConfig))]
 [TomlSerializable(typeof(JwtConfig))]
+[TomlSerializable(typeof(PipelineConfig))]
 [TomlSerializable(typeof(SignalNineConfig))]
 internal sealed partial class SignalNineTomlContext : TomlSerializerContext
 {

@@ -17,4 +17,6 @@ public class SignalNineConfig
     public JobSystemConfig JobSystem { get; set; } = new();
 
     public FfmpegPoolConfig FfmpegPool { get; set; } = new();
+
+    public PipelineConfig Pipeline { get; set; } = new();
 }

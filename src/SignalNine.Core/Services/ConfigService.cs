@@ -55,9 +55,16 @@ public class ConfigService : IConfigService
             updated = true;
         }
 
+        if (config.Pipeline is null)
+        {
+            config.Pipeline = new PipelineConfig();
+            updated = true;
+        }
+
         if (!HasConfigSection(toml, nameof(SignalNineConfig.Jwt)) ||
             !HasConfigSection(toml, nameof(SignalNineConfig.JobSystem)) ||
-            !HasConfigSection(toml, nameof(SignalNineConfig.FfmpegPool)))
+            !HasConfigSection(toml, nameof(SignalNineConfig.FfmpegPool)) ||
+            !HasConfigSection(toml, nameof(SignalNineConfig.Pipeline)))
         {
             updated = true;
         }
