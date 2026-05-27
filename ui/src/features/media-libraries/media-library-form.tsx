@@ -51,12 +51,12 @@ export function MediaLibraryForm(props: Props) {
   };
 
   return (
-    <div className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden bg-panel">
-      <div className="border-b border-border-subtle bg-panel-strong py-2 pl-3 pr-12">
+    <div className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden bg-bg-2">
+      <div className="bg-bg-0 py-2 pl-3 pr-12">
         <div className="text-sm font-semibold text-fg-0">
           {props.mode === 'edit' ? 'Edit Media Library' : 'Create Media Library'}
         </div>
-        <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+        <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">
           {isDirty ? 'Unsaved changes' : 'No pending changes'}
         </div>
       </div>
@@ -65,7 +65,7 @@ export function MediaLibraryForm(props: Props) {
         {error && (
           <div
             role="alert"
-            className="mb-3 rounded-md border border-error/40 bg-error-bg/50 px-3 py-2 text-[12px] text-error"
+            className="mb-3 rounded-[6px] bg-accent-err px-3 py-2 text-[12px] text-fg-0"
           >
             {error}
           </div>
@@ -87,7 +87,9 @@ export function MediaLibraryForm(props: Props) {
             onChange={(defaultMediaType) =>
               setForm((current) => ({
                 ...current,
-                defaultMediaType: Number(defaultMediaType) as MediaLibraryFormValues['defaultMediaType'],
+                defaultMediaType: Number(
+                  defaultMediaType,
+                ) as MediaLibraryFormValues['defaultMediaType'],
               }))
             }
           />
@@ -111,7 +113,7 @@ export function MediaLibraryForm(props: Props) {
             onChange={(sourceRef) => setForm((current) => ({ ...current, sourceRef }))}
           />
           <label className="block md:col-span-2">
-            <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+            <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
               Description
             </span>
             <textarea
@@ -120,18 +122,18 @@ export function MediaLibraryForm(props: Props) {
                 setForm((current) => ({ ...current, description: event.target.value }))
               }
               rows={3}
-              className="mt-1 w-full resize-none rounded-md border border-border bg-bg-1 px-2.5 py-2 text-[12px] text-fg-0 outline-none transition placeholder:text-fg-2 focus:border-on-air"
+              className="mt-1 w-full resize-none rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
             />
           </label>
           {props.mode === 'edit' && (
-            <label className="flex items-center gap-2 rounded-md border border-border-subtle bg-bg-1 px-3 py-2 text-[12px] text-fg-0 md:col-span-2">
+            <label className="flex items-center gap-2 rounded-[6px] bg-bg-1 px-3 py-2 text-[12px] text-fg-1 md:col-span-2">
               <input
                 type="checkbox"
                 checked={form.isActive}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, isActive: event.target.checked }))
                 }
-                className="size-4"
+                className="size-4 accent-accent-live"
               />
               Active library
             </label>
@@ -139,14 +141,14 @@ export function MediaLibraryForm(props: Props) {
         </div>
       </div>
 
-      <footer className="flex justify-end border-t border-border-subtle bg-panel-strong p-3">
+      <footer className="flex justify-end bg-bg-0 p-3">
         <button
           type="button"
           onClick={() => {
             void submit();
           }}
           disabled={props.isSaving || (props.mode === 'edit' && !isDirty)}
-          className="inline-flex items-center justify-center gap-2 rounded-md border border-on-air/50 bg-on-air/15 px-3 py-2 text-sm font-semibold text-on-air-2 transition hover:bg-on-air/20 disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-accent-live px-3 py-2 text-sm font-semibold text-bg-5 transition hover:bg-accent-live-hover disabled:opacity-40"
         >
           <Save className="size-4" />
           {props.isSaving ? 'Saving' : props.mode === 'edit' ? 'Save' : 'Create'}
@@ -167,11 +169,11 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</span>
+      <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-md border border-border bg-bg-1 px-2.5 py-2 text-[12px] text-fg-0 outline-none transition placeholder:text-fg-2 focus:border-on-air"
+        className="mt-1 w-full rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       />
     </label>
   );
@@ -190,11 +192,11 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</span>
+      <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-md border border-border bg-bg-1 px-2.5 py-2 text-[12px] text-fg-0 outline-none transition focus:border-on-air"
+        className="mt-1 w-full rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       >
         {options.map((item) => (
           <option key={item.value} value={item.value}>

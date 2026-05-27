@@ -104,22 +104,26 @@ export function MediaLibrariesPage() {
         <SummaryMetric label="Libraries" value={String(mediaLibraries.libraries.length)} />
         <SummaryMetric
           label="Active"
-          value={String(mediaLibraries.libraries.filter((library) => library.isActive).length)}
+          value={String(
+            mediaLibraries.libraries.filter((library) => library.isActive).length,
+          )}
         />
         <SummaryMetric
           label="Jellyfin"
-          value={String(mediaLibraries.libraries.filter((library) => library.sourceType === 0).length)}
+          value={String(
+            mediaLibraries.libraries.filter((library) => library.sourceType === 0).length,
+          )}
         />
       </div>
 
-      <section className="flex min-h-[26rem] flex-1 flex-col overflow-hidden rounded-lg border border-border bg-panel">
-        <header className="flex flex-wrap items-center gap-3 border-b border-border-subtle bg-panel-strong px-3 py-2">
-          <div className="flex size-8 items-center justify-center rounded-md border border-on-air/40 bg-on-air/10 text-on-air-2">
+      <section className="flex min-h-[26rem] flex-1 flex-col overflow-hidden rounded-[6px] bg-bg-2">
+        <header className="flex flex-wrap items-center gap-3 bg-bg-4 px-3 py-2">
+          <div className="flex size-8 items-center justify-center rounded-[4px] bg-accent-live text-bg-5">
             <Database className="size-4" />
           </div>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold text-fg-0">Media Libraries</h1>
-            <p className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+            <p className="font-mono text-[10px] uppercase tracking-label text-fg-3">
               {filteredLibraries.length} visible
             </p>
           </div>
@@ -127,7 +131,7 @@ export function MediaLibrariesPage() {
             <button
               type="button"
               onClick={() => setEditor({ mode: 'create' })}
-              className="inline-flex items-center gap-2 rounded-md border border-on-air/40 bg-on-air/10 px-2.5 py-1.5 text-[12px] font-semibold text-on-air-2 transition hover:bg-on-air/15"
+              className="inline-flex items-center gap-2 rounded-[6px] bg-accent-live px-2.5 py-1.5 text-[12px] font-semibold text-bg-5 transition hover:bg-accent-live-hover"
             >
               <Plus className="size-3.5" />
               New Library
@@ -137,7 +141,7 @@ export function MediaLibrariesPage() {
               onClick={() => {
                 void mediaLibraries.refresh();
               }}
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-bg-2 px-2.5 py-1.5 text-[12px] text-fg-1 transition hover:border-on-air/40 hover:text-fg-0"
+              className="inline-flex items-center gap-2 rounded-[6px] bg-bg-2 px-2.5 py-1.5 text-[12px] text-fg-1 transition hover:bg-[#343b41] hover:text-fg-0"
             >
               <RefreshCw className="size-3.5" />
               Refresh
@@ -154,8 +158,8 @@ export function MediaLibrariesPage() {
           onActiveFilterChange={setActiveFilter}
         />
 
-        <div className="min-h-0 flex-1 overflow-auto bg-bg-1">
-          <div className="grid min-w-[64rem] grid-cols-[minmax(14rem,1.1fr)_10rem_minmax(18rem,1.4fr)_8rem_11rem_12rem] gap-3 border-b border-border-subtle bg-bg-2 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-2">
+        <div className="min-h-0 flex-1 overflow-auto bg-bg-0">
+          <div className="grid min-w-[64rem] grid-cols-[minmax(14rem,1.1fr)_10rem_minmax(18rem,1.4fr)_8rem_11rem_12rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
             <span>Name</span>
             <span>Media type</span>
             <span>Source</span>
@@ -164,33 +168,36 @@ export function MediaLibrariesPage() {
             <span>Actions</span>
           </div>
           {mediaLibraries.isLoading ? (
-            <div className="flex h-56 items-center justify-center text-sm text-fg-2">
+            <div className="flex h-56 items-center justify-center text-sm text-fg-3">
               Loading media libraries.
             </div>
           ) : mediaLibraries.isError ? (
-            <div className="flex h-56 items-center justify-center text-sm text-error">
+            <div className="flex h-56 items-center justify-center text-sm text-accent-err">
               Failed to load media libraries.
             </div>
           ) : filteredLibraries.length === 0 ? (
-            <div className="flex h-56 items-center justify-center text-sm text-fg-2">
+            <div className="flex h-56 items-center justify-center text-sm text-fg-3">
               No media libraries match this view.
             </div>
           ) : (
-            filteredLibraries.map((library) => (
+            filteredLibraries.map((library, idx) => (
               <div
                 key={library.id}
-                className="grid min-w-[64rem] grid-cols-[minmax(14rem,1.1fr)_10rem_minmax(18rem,1.4fr)_8rem_11rem_12rem] items-center gap-3 border-b border-border-subtle px-3 py-3"
+                className={
+                  'grid min-w-[64rem] grid-cols-[minmax(14rem,1.1fr)_10rem_minmax(18rem,1.4fr)_8rem_11rem_12rem] items-center gap-3 px-3 py-3 ' +
+                  (idx % 2 ? 'bg-bg-3' : 'bg-bg-2')
+                }
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-fg-0">{library.name}</div>
-                  <div className="truncate text-[12px] text-fg-1">
+                  <div className="truncate text-[12px] text-fg-3">
                     {library.description ?? 'No description'}
                   </div>
                 </div>
-                <span className="text-[12px] text-fg-0">
+                <span className="text-[12px] text-fg-1">
                   {channelMediaTypeLabel(library.defaultMediaType)}
                 </span>
-                <span className="break-all font-mono text-[12px] text-fg-1">
+                <span className="break-all font-mono text-[12px] text-fg-2">
                   {mediaSourceTypeLabel(library.sourceType)} · {library.sourceRef}
                 </span>
                 <button
@@ -201,19 +208,26 @@ export function MediaLibrariesPage() {
                   onClick={() => {
                     void toggleActive(library);
                   }}
-                  className="w-fit rounded border border-border bg-bg-2 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-fg-1"
+                  className={
+                    'w-fit rounded-[3px] px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-label ' +
+                    (library.isActive
+                      ? 'bg-accent-live text-bg-5'
+                      : 'bg-accent-warn text-bg-0')
+                  }
                 >
                   {library.isActive ? 'active' : 'paused'}
                 </button>
-                <span className="font-mono text-[12px] text-fg-1">
+                <span className="font-mono text-[12px] text-fg-2">
                   {formatDate(library.lastScannedAt)}
                 </span>
                 <span className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     aria-label={`Edit ${library.name}`}
-                    onClick={() => setEditor({ mode: 'edit', value: mediaLibraryToForm(library) })}
-                    className="rounded-md border border-border bg-bg-2 px-2.5 py-1.5 text-[12px] text-fg-1 transition hover:border-on-air/40 hover:text-fg-0"
+                    onClick={() =>
+                      setEditor({ mode: 'edit', value: mediaLibraryToForm(library) })
+                    }
+                    className="rounded-[6px] bg-bg-2 px-2.5 py-1.5 text-[12px] text-fg-1 transition hover:bg-[#343b41] hover:text-fg-0"
                   >
                     Edit
                   </button>
@@ -223,7 +237,7 @@ export function MediaLibrariesPage() {
                     onClick={() => {
                       void deleteLibrary(library);
                     }}
-                    className="rounded-md border border-error/40 bg-error-bg/40 px-2.5 py-1.5 text-[12px] font-semibold text-error transition hover:bg-error-bg"
+                    className="rounded-[6px] bg-accent-err px-2.5 py-1.5 text-[12px] font-semibold text-fg-0 transition hover:opacity-90"
                   >
                     Delete
                   </button>
@@ -235,7 +249,7 @@ export function MediaLibrariesPage() {
       </section>
 
       <Dialog open={editor !== null} onOpenChange={(open) => !open && setEditor(null)}>
-        <DialogContent className="max-h-[calc(100vh-1.5rem)] max-w-2xl overflow-hidden border-border bg-panel p-0 shadow-2xl">
+        <DialogContent className="max-h-[calc(100vh-1.5rem)] max-w-2xl overflow-hidden p-0">
           <DialogTitle className="sr-only">
             {editor?.mode === 'edit' ? 'Edit Media Library' : 'Create Media Library'}
           </DialogTitle>
@@ -281,8 +295,8 @@ function FilterBar({
   onActiveFilterChange: (value: 'all' | 'active' | 'inactive') => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle bg-bg-1 p-3">
-      <div className="flex items-center gap-2 text-fg-2">
+    <div className="flex flex-wrap items-center gap-2 bg-bg-0 p-3">
+      <div className="flex items-center gap-2 text-fg-3">
         <Filter className="size-4" />
         <span className="font-mono text-[10px] uppercase tracking-label">Filters</span>
       </div>
@@ -290,7 +304,7 @@ function FilterBar({
         aria-label="Default media type filter"
         value={typeFilter}
         onChange={(event) => onTypeFilterChange(event.target.value)}
-        className="rounded-md border border-border bg-bg-2 px-2 py-1.5 text-[12px] text-fg-0 outline-none focus:border-on-air"
+        className="rounded-[6px] bg-bg-2 px-2 py-1.5 text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       >
         <option value="all">All media types</option>
         {CHANNEL_MEDIA_TYPE_OPTIONS.map((item) => (
@@ -303,7 +317,7 @@ function FilterBar({
         aria-label="Source type filter"
         value={sourceFilter}
         onChange={(event) => onSourceFilterChange(event.target.value)}
-        className="rounded-md border border-border bg-bg-2 px-2 py-1.5 text-[12px] text-fg-0 outline-none focus:border-on-air"
+        className="rounded-[6px] bg-bg-2 px-2 py-1.5 text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       >
         <option value="all">All sources</option>
         {MEDIA_SOURCE_TYPE_OPTIONS.map((item) => (
@@ -318,7 +332,7 @@ function FilterBar({
         onChange={(event) =>
           onActiveFilterChange(event.target.value as 'all' | 'active' | 'inactive')
         }
-        className="rounded-md border border-border bg-bg-2 px-2 py-1.5 text-[12px] text-fg-0 outline-none focus:border-on-air"
+        className="rounded-[6px] bg-bg-2 px-2 py-1.5 text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       >
         <option value="all">All states</option>
         <option value="active">Active</option>
@@ -330,8 +344,8 @@ function FilterBar({
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {
   return (
-    <section className="min-w-0 rounded-lg border border-border bg-panel p-3">
-      <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</div>
+    <section className="min-w-0 rounded-[6px] bg-bg-2 p-3">
+      <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</div>
       <div className="truncate text-lg font-semibold text-fg-0">{value}</div>
     </section>
   );
@@ -340,10 +354,10 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
 function AuthRequired() {
   return (
     <div className="flex h-full items-center justify-center p-6">
-      <div className="max-w-md rounded-lg border border-border bg-panel p-5 text-center">
-        <ShieldAlert className="mx-auto mb-3 size-8 text-warn" />
+      <div className="max-w-md rounded-[6px] bg-bg-2 p-5 text-center">
+        <ShieldAlert className="mx-auto mb-3 size-8 text-accent-warn" />
         <h1 className="text-base font-semibold text-fg-0">JWT session required</h1>
-        <p className="mt-2 text-sm text-fg-1">
+        <p className="mt-2 text-sm text-fg-2">
           Media library management requires an authenticated session.
         </p>
       </div>
