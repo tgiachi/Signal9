@@ -1,36 +1,33 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/cn"
+import * as React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/cn';
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md border border-oklch(0.922 0 0) px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-oklch(0.708 0 0) focus:ring-offset-2 dark:border-oklch(1 0 0 / 10%) dark:focus:ring-oklch(0.556 0 0)",
+  'inline-flex items-center rounded-[3px] px-2 py-0.5 font-mono text-[9px] font-bold tracking-[0.08em] uppercase',
   {
     variants: {
       variant: {
-        default:
-          "border-transparent bg-oklch(0.205 0 0) text-oklch(0.985 0 0) shadow hover:bg-oklch(0.205 0 0)/80 dark:bg-oklch(0.922 0 0) dark:text-oklch(0.205 0 0) dark:hover:bg-oklch(0.922 0 0)/80",
-        secondary:
-          "border-transparent bg-oklch(0.97 0 0) text-oklch(0.205 0 0) hover:bg-oklch(0.97 0 0)/80 dark:bg-oklch(0.269 0 0) dark:text-oklch(0.985 0 0) dark:hover:bg-oklch(0.269 0 0)/80",
-        destructive:
-          "border-transparent bg-oklch(0.577 0.245 27.325) text-destructive-foreground shadow hover:bg-oklch(0.577 0.245 27.325)/80 dark:bg-oklch(0.704 0.191 22.216) dark:hover:bg-oklch(0.704 0.191 22.216)/80",
-        outline: "text-oklch(0.145 0 0) dark:text-oklch(0.985 0 0)",
+        live: 'bg-accent-live text-bg-5',
+        off: 'bg-bg-2 text-fg-3',
+        err: 'bg-accent-err text-fg-0',
+        warn: 'bg-accent-warn text-bg-0',
+        queue: 'bg-accent-cfg text-fg-0',
+        run: 'bg-accent-jobs text-fg-0',
+        ok: 'bg-accent-live text-bg-5',
       },
     },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
+    defaultVariants: { variant: 'off' },
+  },
+);
+
+export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
-  )
+export function Badge({ className, variant, ...props }: BadgeProps) {
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
-export { Badge, badgeVariants }
+export { badgeVariants };
