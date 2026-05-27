@@ -39,21 +39,21 @@ export function ChannelForm({
   const mode = value.id ? 'edit' : 'create';
 
   return (
-    <div className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden bg-panel">
-      <header className="flex items-center gap-2 border-b border-border-subtle bg-panel-strong py-2 pl-3 pr-12">
-        <RadioTower className="size-4 text-on-air-2" />
+    <div className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden bg-bg-2">
+      <header className="flex items-center gap-2 bg-bg-0 py-2 pl-3 pr-12">
+        <RadioTower className="size-4 text-accent-live" />
         <div className="min-w-0">
           <div className="text-sm font-semibold text-fg-0">
             {mode === 'edit' ? 'Edit Channel' : 'Create Channel'}
           </div>
-          <p className="font-mono text-[10px] text-fg-2">
+          <p className="font-mono text-[10px] text-fg-3">
             {mode === 'edit' ? value.slug || value.id : 'new channel'}
           </p>
         </div>
         <button
           type="button"
           onClick={onCreateNew}
-          className="ml-auto inline-flex items-center gap-2 rounded-md border border-border bg-bg-2 px-2.5 py-1.5 text-[12px] text-fg-1 transition hover:border-on-air/40 hover:text-fg-0"
+          className="ml-auto inline-flex items-center gap-2 rounded-[6px] bg-bg-2 px-2.5 py-1.5 text-[12px] text-fg-1 transition hover:bg-[#343b41] hover:text-fg-0"
         >
           <Plus className="size-3.5" />
           New
@@ -62,7 +62,7 @@ export function ChannelForm({
 
       <div className="min-h-0 flex-1 overflow-auto p-3">
         {validationError && (
-          <div className="mb-3 rounded-md border border-error/40 bg-error-bg/50 px-3 py-2 text-[12px] text-error">
+          <div className="mb-3 rounded-[6px] bg-accent-err px-3 py-2 text-[12px] text-fg-0">
             {validationError}
           </div>
         )}
@@ -137,12 +137,12 @@ export function ChannelForm({
         </div>
       </div>
 
-      <footer className="flex flex-wrap items-center gap-2 border-t border-border-subtle bg-panel-strong p-3">
+      <footer className="flex flex-wrap items-center gap-2 bg-bg-0 p-3">
         <button
           type="button"
           onClick={onSubmit}
           disabled={isSaving}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-on-air/50 bg-on-air/15 px-3 py-2 text-sm font-semibold text-on-air-2 transition hover:bg-on-air/20 disabled:opacity-40"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-[6px] bg-accent-live px-3 py-2 text-sm font-semibold text-bg-5 transition hover:bg-accent-live-hover disabled:opacity-40"
         >
           <Save className="size-4" />
           {isSaving ? 'Saving' : mode === 'edit' ? 'Save' : 'Create'}
@@ -151,7 +151,7 @@ export function ChannelForm({
           type="button"
           onClick={onDelete}
           disabled={!value.id || isDeleting}
-          className="inline-flex items-center justify-center gap-2 rounded-md border border-error/40 bg-error-bg/40 px-3 py-2 text-sm font-semibold text-error transition hover:bg-error-bg disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-accent-err px-3 py-2 text-sm font-semibold text-fg-0 transition hover:opacity-90 disabled:opacity-40"
         >
           <Trash2 className="size-4" />
           Delete
@@ -171,9 +171,9 @@ function LogoUploadRow({
   onUpload: (file: File) => void;
 }) {
   return (
-    <div className="rounded-md border border-border-subtle bg-bg-1 p-3">
+    <div className="rounded-[6px] bg-bg-1 p-3">
       <div className="flex items-center gap-3">
-        <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-bg-2 text-fg-2">
+        <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[4px] bg-bg-3 text-fg-3">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="size-full object-cover" />
           ) : (
@@ -181,14 +181,14 @@ function LogoUploadRow({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+          <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">
             Logo upload
           </div>
           <div className="truncate text-[12px] text-fg-1">
             {logoUrl || 'PNG, JPEG, or WebP up to 2 MB'}
           </div>
         </div>
-        <label className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-on-air/40 bg-on-air/10 px-2.5 py-1.5 text-[12px] font-semibold text-on-air-2 transition hover:bg-on-air/15">
+        <label className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[6px] bg-accent-live px-2.5 py-1.5 text-[12px] font-semibold text-bg-5 transition hover:bg-accent-live-hover">
           <Upload className="size-3.5" />
           {isUploading ? 'Uploading' : 'Upload'}
           <input
@@ -222,12 +222,12 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</span>
+      <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="mt-1 w-full rounded-md border border-border bg-bg-1 px-2.5 py-2 text-[12px] text-fg-0 outline-none transition placeholder:text-fg-2 focus:border-on-air"
+        className="mt-1 w-full rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       />
     </label>
   );
@@ -246,13 +246,13 @@ function TextArea({
 }) {
   return (
     <label className="block">
-      <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</span>
+      <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</span>
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="mt-1 w-full resize-none rounded-md border border-border bg-bg-1 px-2.5 py-2 text-[12px] text-fg-0 outline-none transition placeholder:text-fg-2 focus:border-on-air"
+        className="mt-1 w-full resize-none rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       />
     </label>
   );
@@ -271,13 +271,13 @@ function NumberField({
 }) {
   return (
     <label className="block min-w-0">
-      <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</span>
+      <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</span>
       <input
         type="number"
         min={min}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1 w-full rounded-md border border-border bg-bg-1 px-2 py-2 font-mono text-[12px] text-fg-0 outline-none transition focus:border-on-air"
+        className="mt-1 w-full rounded-[6px] bg-bg-1 px-2 py-2 font-mono text-[12px] text-fg-1 outline-none transition focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
       />
     </label>
   );
@@ -299,13 +299,13 @@ function ToggleRow({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-md border border-border-subtle bg-bg-1 px-3 py-2',
+        'flex items-center justify-between gap-3 rounded-[6px] bg-bg-1 px-3 py-2',
         disabled && 'opacity-60',
       )}
     >
       <span className="min-w-0">
         <span className="block text-[12px] font-semibold text-fg-0">{label}</span>
-        <span className="block text-[11px] text-fg-2">{description}</span>
+        <span className="block text-[11px] text-fg-3">{description}</span>
       </span>
       <button
         type="button"
@@ -315,15 +315,13 @@ function ToggleRow({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
-          'inline-flex h-7 w-14 shrink-0 items-center rounded-full border px-1 transition',
-          checked
-            ? 'border-on-air/40 bg-on-air/15 text-on-air-2'
-            : 'border-border bg-bg-2 text-fg-2',
+          'inline-flex h-7 w-14 shrink-0 items-center rounded-full px-1 transition',
+          checked ? 'bg-accent-live text-bg-5' : 'bg-bg-3 text-fg-3',
         )}
       >
         <span
           className={cn(
-            'flex size-5 items-center justify-center rounded-full bg-bg-0 transition',
+            'flex size-5 items-center justify-center rounded-full bg-bg-5 transition',
             checked && 'translate-x-7',
           )}
         >

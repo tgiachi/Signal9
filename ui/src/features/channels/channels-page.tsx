@@ -122,10 +122,10 @@ export function ChannelsPage() {
   if (!channels.authenticated) {
     return (
       <div className="flex h-full items-center justify-center p-6">
-        <div className="max-w-md rounded-lg border border-border bg-panel p-5 text-center">
-          <ShieldAlert className="mx-auto mb-3 size-8 text-warn" />
+        <div className="max-w-md rounded-[6px] bg-bg-2 p-5 text-center">
+          <ShieldAlert className="mx-auto mb-3 size-8 text-accent-warn" />
           <h1 className="text-base font-semibold text-fg-0">JWT session required</h1>
-          <p className="mt-2 text-sm text-fg-1">
+          <p className="mt-2 text-sm text-fg-2">
             Channel management requires an authenticated SignalNine operator session.
           </p>
         </div>
@@ -169,7 +169,7 @@ export function ChannelsPage() {
         onSelect={selectChannel}
       />
       <Dialog open={editorOpen} onOpenChange={closeEditor}>
-        <DialogContent className="max-h-[calc(100vh-1.5rem)] max-w-3xl overflow-hidden border-border bg-panel p-0 shadow-2xl">
+        <DialogContent className="max-h-[calc(100vh-1.5rem)] max-w-3xl overflow-hidden p-0">
           <DialogTitle className="sr-only">
             {draft.id ? 'Edit Channel' : 'Create Channel'}
           </DialogTitle>
@@ -210,13 +210,13 @@ function SummaryMetric({
   detail: string;
 }) {
   return (
-    <section className="min-w-0 rounded-lg border border-border bg-panel p-3">
-      <div className="mb-2 flex size-7 items-center justify-center rounded border border-on-air/40 bg-on-air/10 text-on-air-2">
+    <section className="min-w-0 rounded-[6px] bg-bg-2 p-3">
+      <div className="mb-2 flex size-7 items-center justify-center rounded-[4px] bg-accent-live text-bg-5">
         {icon}
       </div>
-      <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">{label}</div>
+      <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">{label}</div>
       <div className="truncate text-lg font-semibold text-fg-0">{value}</div>
-      <div className="truncate text-[12px] text-fg-2">{detail}</div>
+      <div className="truncate text-[12px] text-fg-3">{detail}</div>
     </section>
   );
 }
