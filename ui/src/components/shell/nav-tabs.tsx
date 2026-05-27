@@ -22,14 +22,14 @@ const TABS = [
 
 export function NavTabs() {
   return (
-    <nav className="flex shrink-0 flex-col border-r border-border bg-bg-1 md:w-36 max-md:order-last max-md:h-16 max-md:w-full max-md:border-r-0 max-md:border-t">
-      <div className="hidden h-16 items-center gap-2 border-b border-border-subtle px-3 md:flex">
-        <div className="flex size-8 items-center justify-center rounded-md border border-on-air/40 bg-on-air/10 text-on-air-2">
+    <nav className="flex shrink-0 flex-col bg-bg-1 md:w-[168px] max-md:order-last max-md:h-16 max-md:w-full">
+      <div className="hidden h-16 items-center gap-2.5 px-3 md:flex">
+        <div className="flex size-9 items-center justify-center rounded-[6px] bg-accent-live text-bg-5 font-bold text-[13px] tracking-[0.05em]">
           S9
         </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold tracking-[0.12em] text-fg-0">SIGNAL</div>
-          <div className="text-sm font-semibold tracking-[0.12em] text-on-air-2">NINE</div>
+        <div className="min-w-0 leading-[1.1]">
+          <div className="text-[13px] font-bold tracking-brand text-fg-1">SIGNAL</div>
+          <div className="text-[13px] font-bold tracking-brand text-accent-live">NINE</div>
         </div>
       </div>
       <div className="flex min-h-0 flex-1 gap-1 p-2 md:flex-col max-md:grid max-md:grid-cols-7">
@@ -42,14 +42,14 @@ export function NavTabs() {
               end
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2 rounded-md border px-2 py-2 text-[12px] transition-colors md:justify-start max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-1',
+                  'flex items-center gap-2.5 rounded-[6px] px-2.5 py-2 text-[12px] transition-colors md:justify-start max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-1',
                   isActive
-                    ? 'border-on-air/40 bg-on-air/10 text-on-air-2'
-                    : 'border-transparent text-fg-1 hover:bg-bg-2 hover:text-fg-0',
+                    ? 'bg-accent-live text-bg-5 font-semibold'
+                    : 'text-fg-3 hover:bg-bg-2 hover:text-fg-1',
                 )
               }
             >
-              <Icon className="size-4 shrink-0" />
+              <Icon className="size-3.5 shrink-0" />
               <span className="truncate">{t.label}</span>
             </NavLink>
           );
