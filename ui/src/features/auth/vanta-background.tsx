@@ -30,8 +30,8 @@ export function VantaBackground() {
           el: container,
           THREE,
           backgroundAlpha: 0,
-          backgroundColor: 0x07090d,
-          color: 0x52c7e8,
+          backgroundColor: 0x1e272e,
+          color: 0x00b894,
           gyroControls: false,
           maxDistance: 22,
           minHeight: 200,
@@ -62,7 +62,7 @@ export function VantaBackground() {
       ref={containerRef}
       aria-hidden="true"
       data-testid="login-vanta-background"
-      className="absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(82,199,232,0.18),transparent_32%),linear-gradient(135deg,#07090d_0%,#0d1216_48%,#07120d_100%)]"
+      className="absolute inset-0 bg-bg-0"
     />
   );
 }

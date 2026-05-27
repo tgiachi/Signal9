@@ -30,24 +30,24 @@ export function LoginScreen() {
   };
 
   return (
-    <main className="relative isolate flex min-h-full items-center justify-center overflow-hidden bg-bg-0 p-4 text-fg-0">
+    <main className="relative isolate flex min-h-full items-center justify-center overflow-hidden bg-bg-0 p-4 text-fg-1">
       <VantaBackground />
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,9,13,0.72),rgba(7,9,13,0.56)),radial-gradient(circle_at_78%_24%,rgba(54,209,95,0.12),transparent_30%)]"
+        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(14,20,24,0.78),rgba(14,20,24,0.58))]"
       />
-      <section className="relative z-10 grid w-full max-w-5xl overflow-hidden rounded-lg border border-border/80 bg-panel/95 shadow-2xl shadow-black/35 backdrop-blur-xl md:grid-cols-[1fr_26rem]">
-        <div className="flex min-h-[28rem] flex-col justify-between bg-panel-strong/90 p-6">
+      <section className="relative z-10 grid w-full max-w-5xl overflow-hidden rounded-[10px] bg-bg-2 md:grid-cols-[1fr_26rem]">
+        <div className="flex min-h-[28rem] flex-col justify-between bg-bg-4 p-6">
           <div>
             <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-md border border-on-air/40 bg-on-air/10 text-on-air-2">
+              <div className="flex size-10 items-center justify-center rounded-[6px] bg-accent-live text-bg-5">
                 <RadioTower className="size-5" />
               </div>
               <div>
-                <div className="text-lg font-semibold tracking-[0.14em] text-fg-0">
-                  SIGNAL<span className="text-on-air-2">NINE</span>
+                <div className="text-lg font-semibold tracking-brand text-fg-0">
+                  SIGNAL<span className="text-accent-live">NINE</span>
                 </div>
-                <div className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+                <div className="font-mono text-[10px] uppercase tracking-label text-fg-3">
                   Broadcast control room
                 </div>
               </div>
@@ -55,46 +55,46 @@ export function LoginScreen() {
             <h1 className="mt-10 max-w-lg text-2xl font-semibold tracking-normal text-fg-0">
               Control room access
             </h1>
-            <p className="mt-3 max-w-lg text-sm leading-6 text-fg-1">
+            <p className="mt-3 max-w-lg text-sm leading-6 text-fg-2">
               Resume broadcast operations with a verified SignalNine operator account.
             </p>
           </div>
         </div>
         <form className="flex flex-col justify-center gap-4 p-6" onSubmit={submit}>
-          <div className="flex size-10 items-center justify-center rounded-md border border-cyan/40 bg-cyan/10 text-cyan">
+          <div className="flex size-10 items-center justify-center rounded-[6px] bg-accent-jobs text-fg-0">
             <ShieldCheck className="size-5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold">JWT session</h2>
-            <p className="mt-1 text-sm text-fg-1">Use a SignalNine user account.</p>
+            <h2 className="text-base font-semibold text-fg-0">JWT session</h2>
+            <p className="mt-1 text-sm text-fg-2">Use a SignalNine user account.</p>
           </div>
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+            <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
               Username
             </span>
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              className="mt-1 h-10 w-full rounded-md border border-border bg-bg-1 px-3 text-sm outline-none focus:border-on-air"
+              className="mt-1 h-10 w-full rounded-[6px] bg-bg-1 px-3 text-sm text-fg-1 outline-none placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
               autoComplete="username"
             />
           </label>
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-label text-fg-2">
+            <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
               Password
             </span>
             <input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"
-              className="mt-1 h-10 w-full rounded-md border border-border bg-bg-1 px-3 text-sm outline-none focus:border-on-air"
+              className="mt-1 h-10 w-full rounded-[6px] bg-bg-1 px-3 text-sm text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
               autoComplete="current-password"
             />
           </label>
           {error && (
             <div
               role="alert"
-              className="rounded border border-error/40 bg-error-bg/50 px-3 py-2 text-sm text-error"
+              className="rounded-[6px] bg-accent-err px-3 py-2 text-sm text-fg-0"
             >
               {error}
             </div>
@@ -102,7 +102,7 @@ export function LoginScreen() {
           <button
             type="submit"
             disabled={isSubmitting || !username.trim() || !password}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-on-air/50 bg-on-air/15 px-3 text-sm font-semibold text-on-air-2 transition hover:bg-on-air/20 disabled:opacity-40"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[6px] bg-accent-live px-3 text-sm font-semibold text-bg-5 transition hover:bg-accent-live-hover disabled:opacity-40"
           >
             <KeyRound className="size-4" />
             {isSubmitting ? 'Signing in' : 'Sign in'}
