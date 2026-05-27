@@ -33,7 +33,6 @@ export function useJobs() {
 
   useEffect(() => {
     if (!auth.authenticated) {
-      setConnection('disconnected');
       return undefined;
     }
 
@@ -74,7 +73,7 @@ export function useJobs() {
     },
   });
 
-  const jobs = query.data ?? [];
+  const jobs = useMemo(() => query.data ?? [], [query.data]);
   const counts = useMemo(
     () => ({
       queued: jobs.filter((job) => job.state === 'queued').length,

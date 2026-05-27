@@ -30,13 +30,21 @@ function readStoredAuth(): StoredAuth | null {
   }
 }
 
+function installTokenProviders(auth: StoredAuth | null): void {
+  const provider = () => auth?.accessToken ?? null;
+  setApiAccessTokenProvider(provider);
+  setSignalRAccessTokenProvider(provider);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuth] = useState<StoredAuth | null>(() => readStoredAuth());
+  const [auth, setAuth] = useState<StoredAuth | null>(() => {
+    const stored = readStoredAuth();
+    installTokenProviders(stored);
+    return stored;
+  });
 
   useEffect(() => {
-    const provider = () => auth?.accessToken ?? null;
-    setApiAccessTokenProvider(provider);
-    setSignalRAccessTokenProvider(provider);
+    installTokenProviders(auth);
   }, [auth]);
 
   const value = useMemo(
@@ -57,10 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user: response.user,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        installTokenProviders(next);
         setAuth(next);
       },
       logout: () => {
         localStorage.removeItem(STORAGE_KEY);
+        installTokenProviders(null);
         setAuth(null);
       },
     }),

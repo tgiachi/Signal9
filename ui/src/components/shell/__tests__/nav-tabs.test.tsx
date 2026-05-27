@@ -12,6 +12,14 @@ describe('NavTabs', () => {
     );
     expect(screen.getByRole('link', { name: 'Logs' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Config' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Jellyfin' })).toHaveAttribute(
+      'href',
+      '/settings/jellyfin',
+    );
+    expect(screen.getByRole('link', { name: 'Libraries' })).toHaveAttribute(
+      'href',
+      '/media-libraries',
+    );
   });
 
   it('marks the active tab', () => {

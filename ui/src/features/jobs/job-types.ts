@@ -42,7 +42,8 @@ export function normalizeJobState(value: JobState | number | string): JobState {
   if (typeof value === 'number') return STATES[value] ?? 'queued';
 
   const normalized = String(value).trim().toLowerCase();
-  if (normalized in STATE_BY_NAME) return STATE_BY_NAME[normalized];
+  const state = STATE_BY_NAME[normalized];
+  if (state) return state;
 
   return 'queued';
 }

@@ -6,13 +6,13 @@ describe('StatusBar', () => {
   it('renders the live pill in green when connected', () => {
     render(<StatusBar connection="connected" configOk errorCount={0} />);
     const pill = screen.getByTestId('pill-live');
-    expect(pill).toHaveTextContent(/LIVE/);
-    expect(pill).toHaveClass('bg-on-air');
+    expect(pill).toHaveTextContent(/ON AIR/);
+    expect(pill).toHaveClass('text-on-air-2');
   });
 
   it('renders the error pill with count when errors > 0', () => {
     render(<StatusBar connection="connected" configOk errorCount={3} />);
-    expect(screen.getByTestId('pill-err')).toHaveTextContent('3 ERR');
+    expect(screen.getByTestId('pill-err')).toHaveTextContent('3 err');
   });
 
   it('renders reconnecting state', () => {

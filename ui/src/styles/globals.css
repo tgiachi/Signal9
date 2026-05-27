@@ -5,6 +5,31 @@
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
 
+@theme {
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-bg-4: var(--bg-4);
+  --color-panel: var(--panel);
+  --color-panel-strong: var(--panel-strong);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-fg-0: var(--fg-0);
+  --color-fg-1: var(--fg-1);
+  --color-fg-2: var(--fg-2);
+  --color-on-air: var(--on-air);
+  --color-on-air-2: var(--on-air-2);
+  --color-warn: var(--warn);
+  --color-error: var(--error);
+  --color-error-bg: var(--error-bg);
+  --color-cyan: var(--cyan);
+  --color-violet: var(--violet);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --tracking-label: 0.08em;
+}
+
 :root {
   --bg-0: #07090d;
   --bg-1: #0d1216;

@@ -12,6 +12,9 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
       '/hubs': { target: 'http://localhost:5017', changeOrigin: true, secure: false, ws: true },
+      '/health': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
+      '/live': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
+      '/swagger': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
     },
   },
   build: {
