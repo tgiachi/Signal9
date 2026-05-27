@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+:root {
+  --bg-0: #0a0d12;
+  --bg-1: #0d1117;
+  --bg-2: #161b22;
+  --bg-3: #21262d;
+  --border: #30363d;
+  --border-subtle: #21262d;
+  --fg-0: #e6edf3;
+  --fg-1: #9ca3af;
+  --fg-2: #6e7681;
+  --on-air: #22c55e;
+  --on-air-2: #7ee787;
+  --warn: #f0b429;
+  --error: #ff7b72;
+  --error-bg: #7f1d1d;
+  --syn-key: #79c0ff;
+  --syn-str: #a5d6ff;
+  --syn-num: #f0b429;
+  --syn-sec: #ff7b72;
+  --syn-cmt: #6e7681;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  background: var(--bg-0);
+  color: var(--fg-0);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
