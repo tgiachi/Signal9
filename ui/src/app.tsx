@@ -5,6 +5,7 @@ import { QueryProvider } from './providers/query-provider';
 import { ThemeProvider } from './providers/theme-provider';
 import { AuthProvider } from './providers/auth-provider';
 import { LogStreamProvider } from './features/logs/log-stream-context';
+import { JobsProvider } from './features/jobs/jobs-context';
 
 export default function App() {
   return (
@@ -12,7 +13,9 @@ export default function App() {
       <QueryProvider>
         <AuthProvider>
           <LogStreamProvider>
-            <RouterProvider router={router} />
+            <JobsProvider>
+              <RouterProvider router={router} />
+            </JobsProvider>
           </LogStreamProvider>
           <Toaster position="bottom-right" theme="dark" richColors />
         </AuthProvider>

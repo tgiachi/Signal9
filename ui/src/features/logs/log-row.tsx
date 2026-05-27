@@ -15,7 +15,7 @@ function formatTime(iso: string): string {
 
 export function LogRow({ entry }: { entry: LogEntry }) {
   return (
-    <div className="flex gap-3 px-3 py-0.5 font-mono text-[12px] leading-[1.6] hover:bg-bg-2">
+    <div className="grid grid-cols-[5.5rem_4rem_minmax(6rem,10rem)_minmax(0,1fr)] gap-3 border-b border-border-subtle/50 px-3 py-1 font-mono text-[12px] leading-[1.45] hover:bg-bg-2">
       <span data-testid="log-ts" className="shrink-0 text-fg-2">
         {formatTime(entry.ts)}
       </span>
@@ -25,8 +25,8 @@ export function LogRow({ entry }: { entry: LogEntry }) {
       >
         {entry.level.toUpperCase()}
       </span>
-      <span className="shrink-0 text-[color:var(--syn-key)]">{entry.source}</span>
-      <span className="text-fg-0">{entry.message}</span>
+      <span className="truncate text-[color:var(--syn-key)]">{entry.source}</span>
+      <span className="min-w-0 break-words text-fg-0">{entry.message}</span>
     </div>
   );
 }

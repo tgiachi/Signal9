@@ -9,6 +9,9 @@ export default {
         'bg-1': 'var(--bg-1)',
         'bg-2': 'var(--bg-2)',
         'bg-3': 'var(--bg-3)',
+        'bg-4': 'var(--bg-4)',
+        panel: 'var(--panel)',
+        'panel-strong': 'var(--panel-strong)',
         border: 'var(--border)',
         'border-subtle': 'var(--border-subtle)',
         'fg-0': 'var(--fg-0)',
@@ -19,6 +22,8 @@ export default {
         warn: 'var(--warn)',
         error: 'var(--error)',
         'error-bg': 'var(--error-bg)',
+        cyan: 'var(--cyan)',
+        violet: 'var(--violet)',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],

@@ -9,11 +9,11 @@ type Props = {
   isSaving: boolean;
 };
 
-type Sections = Record<string, Record<string, TomlValue>>;
+type ConfigDocument = Record<string, TomlValue>;
 
-function readInitial(text: string): Sections {
+function readInitial(text: string): ConfigDocument {
   try {
-    return parseToml(text) as Sections;
+    return parseToml(text);
   } catch {
     return {};
   }
@@ -30,9 +30,38 @@ function emptyForField(f: FieldSpec): TomlValue {
   }
 }
 
+function getValue(data: ConfigDocument, path: readonly string[]): TomlValue | undefined {
+  let current: TomlValue | undefined = data;
+  for (const segment of path) {
+    if (!current || typeof current !== 'object' || current instanceof Date || Array.isArray(current)) {
+      return undefined;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+function setValue(data: ConfigDocument, path: readonly string[], value: TomlValue): ConfigDocument {
+  const [head, ...rest] = path;
+  if (!head) return data;
+
+  if (rest.length === 0) return { ...data, [head]: value };
+
+  const current = data[head];
+  const branch =
+    current && typeof current === 'object' && !(current instanceof Date) && !Array.isArray(current)
+      ? (current as ConfigDocument)
+      : {};
+
+  return {
+    ...data,
+    [head]: setValue(branch, rest, value),
+  };
+}
+
 export function ConfigForm({ initialText, onSave, isSaving }: Props) {
   const initial = useMemo(() => readInitial(initialText), [initialText]);
-  const [data, setData] = useState<Sections>(() => structuredClone(initial));
+  const [data, setData] = useState<ConfigDocument>(() => structuredClone(initial));
   const firstSection = SCHEMA[0];
   if (!firstSection) throw new Error('SCHEMA must contain at least one section');
   const [activeKey, setActiveKey] = useState<string>(firstSection.key);
@@ -42,13 +71,9 @@ export function ConfigForm({ initialText, onSave, isSaving }: Props) {
   );
 
   const section = SCHEMA.find((s) => s.key === activeKey) ?? firstSection;
-  const sectionData = data[section.key] ?? {};
 
-  const update = (key: string, value: TomlValue) => {
-    setData((prev) => ({
-      ...prev,
-      [section.key]: { ...(prev[section.key] ?? {}), [key]: value },
-    }));
+  const update = (path: readonly string[], value: TomlValue) => {
+    setData((prev) => setValue(prev, path, value));
   };
 
   return (
@@ -62,10 +87,10 @@ export function ConfigForm({ initialText, onSave, isSaving }: Props) {
           <div className="flex flex-col gap-4">
             {section.fields.map((f) => (
               <FieldRow
-                key={f.key}
+                key={f.path.join('.')}
                 spec={f}
-                value={sectionData[f.key] ?? emptyForField(f)}
-                onChange={(v) => update(f.key, v)}
+                value={getValue(data, f.path) ?? emptyForField(f)}
+                onChange={(v) => update(f.path, v)}
               />
             ))}
           </div>
@@ -102,7 +127,7 @@ function FieldRow({
   value: TomlValue;
   onChange: (next: TomlValue) => void;
 }) {
-  const id = `cfg-${spec.key}`;
+  const id = `cfg-${spec.path.join('-')}`;
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="font-mono text-[10px] uppercase tracking-label text-fg-1">
@@ -112,12 +137,15 @@ function FieldRow({
         <select
           id={id}
           value={String(value)}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-72 rounded border border-border bg-bg-0 px-2 py-1 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
+          onChange={(e) => {
+            const option = spec.options?.find((item) => String(item.value) === e.target.value);
+            onChange(option?.value ?? e.target.value);
+          }}
+          className="w-full max-w-[28rem] rounded border border-border bg-bg-0 px-2 py-1.5 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
         >
           {spec.options.map((o) => (
-            <option key={o} value={o}>
-              {o}
+            <option key={String(o.value)} value={String(o.value)}>
+              {o.label}
             </option>
           ))}
         </select>
@@ -127,7 +155,7 @@ function FieldRow({
           id={id}
           value={String(value)}
           onChange={(e) => onChange(e.target.value)}
-          className="w-72 rounded border border-border bg-bg-0 px-2 py-1 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
+          className="w-full max-w-[28rem] rounded border border-border bg-bg-0 px-2 py-1.5 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
         />
       )}
       {spec.type === 'number' && (
@@ -136,7 +164,7 @@ function FieldRow({
           type="number"
           value={Number(value)}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-32 rounded border border-border bg-bg-0 px-2 py-1 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
+          className="w-36 rounded border border-border bg-bg-0 px-2 py-1.5 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
         />
       )}
       {spec.type === 'boolean' && (
