@@ -5,27 +5,15 @@ namespace SignalNine.Core.Types;
 /// </summary>
 public enum DirectoryType
 {
-    /// <summary>Directory for storing application configuration files.</summary>
+    /// <summary>Application configuration files.</summary>
     Configs,
 
-    /// <summary>Directory for storing log files.</summary>
+    /// <summary>Log files.</summary>
     Logs,
 
-    /// <summary>Directory for storing database files.</summary>
+    /// <summary>Database files.</summary>
     Db,
 
-    /// <summary>Directory for storing channel bumpers.</summary>
-    Bumpers,
-
-    /// <summary>Directory for storing commercial media.</summary>
-    Commercials,
-
-    /// <summary>Directory for storing television show media.</summary>
-    TvShows,
-
-    /// <summary>Directory for storing movie media.</summary>
-    Movies,
-
-    /// <summary>Directory for uploaded assets (logos, future thumbnails, …).</summary>
+    /// <summary>Uploaded assets (logos, future thumbnails, …).</summary>
     Assets
 }
