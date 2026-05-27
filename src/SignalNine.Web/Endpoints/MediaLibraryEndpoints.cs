@@ -1,7 +1,13 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
+using SignalNine.Core.Data.Channels;
+using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Interfaces;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Web.Data.Channels;
+using SignalNine.Web.Data.Jobs;
+using SignalNine.Web.Services;
 
 namespace SignalNine.Web.Endpoints;
 
@@ -19,6 +25,7 @@ public static class MediaLibraryEndpoints
         group.MapPost(string.Empty, Create);
         group.MapPut("/{id:guid}", Update);
         group.MapDelete("/{id:guid}", Delete);
+        group.MapPost("/{id:guid}/scan", Scan);
 
         return app;
     }
@@ -116,6 +123,42 @@ public static class MediaLibraryEndpoints
 
         dataAccess.Delete(entity.Id);
         return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Accepted<JobResponse>, NotFound, Conflict<string>>> Scan(
+        Guid id,
+        IDataAccess<MediaLibraryEntity> dataAccess,
+        IJobManager jobs,
+        CancellationToken ct
+    )
+    {
+        var library = dataAccess.GetByKey(id);
+        if (library is null) return TypedResults.NotFound();
+        if (!library.IsActive) return TypedResults.Conflict("Library is inactive.");
+
+        var payload = JsonSerializer.Serialize(new ScanLibraryPayload(id));
+        var snapshot = await jobs.EnqueueAsync(new EnqueueJobCommand
+        {
+            Type = LibraryScanJobHandler.JobType,
+            PayloadJson = payload
+        }, ct);
+
+        return TypedResults.Accepted($"/api/jobs/{snapshot.Id}", ToJobResponse(snapshot));
+    }
+
+    private static JobResponse ToJobResponse(JobSnapshot job)
+    {
+        return new(
+            job.Id,
+            job.Type,
+            job.State,
+            job.Progress.Percent,
+            job.Progress.Message,
+            job.Error,
+            job.CreatedAt,
+            job.StartedAt,
+            job.FinishedAt
+        );
     }
 
     private static MediaLibraryResponse ToResponse(MediaLibraryEntity e)
