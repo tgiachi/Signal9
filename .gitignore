@@ -588,6 +588,7 @@ definitions.lua
 .worktrees/
 .worktrees
 .superpowers/
+.codegraph/
 
 # Vite build artifact (frontend output)
 src/SignalNine.Web/wwwroot/

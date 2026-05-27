@@ -1,0 +1,6 @@
+<Solution>
+    <Project Path="src/SignalNine.Core/SignalNine.Core.csproj" />
+    <Project Path="src/SignalNine.Persistence/SignalNine.Persistence.csproj" />
+    <Project Path="src/SignalNine.Web/SignalNine.Web.csproj" />
+    <Project Path="tests/SignalNine.Tests/SignalNine.Tests.csproj" />
+</Solution>

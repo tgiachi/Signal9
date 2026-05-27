@@ -1,0 +1,6 @@
+@SignalNine.Web_HostAddress = http://localhost:5017
+
+GET {{SignalNine.Web_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
