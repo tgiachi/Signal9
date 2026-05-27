@@ -593,5 +593,9 @@ definitions.lua
 # Vite build artifact (frontend output)
 src/SignalNine.Web/wwwroot/
 
+# Frontend feature directory: do NOT ignore even though "logs" matches Visual Studio rule
+!ui/src/features/logs/
+!ui/src/features/logs/**
+
 dist/
 benchmarks/.compare
