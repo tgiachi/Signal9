@@ -4,20 +4,13 @@ Vite + React + TS frontend for the SignalNine operator console (Broadcast Contro
 
 ## Develop
 
-Against real backend on `:5001`:
-
 ```bash
 npm install
 npm run dev
-# http://localhost:5173 — proxies /api and /hub to :5001
+# http://localhost:5173 — proxies /api and /hubs to the ASP.NET backend on :5001
 ```
 
-In isolation (no backend running):
-
-```bash
-npm run dev:mocks
-# MSW + mock SignalR drive the UI from fixtures
-```
+Start the backend with `dotnet run --project src/SignalNine.Web` in another shell.
 
 ## Build
 
@@ -36,11 +29,11 @@ npm run lint
 npm run format
 ```
 
-## Backend contract (assumption — not implemented in this repo)
+## Backend contract
 
 - `GET /api/config` → `200 text/plain` raw TOML
 - `POST /api/config` → `text/plain` body; `200` ok / `422 { message, line?, column? }`
-- `/hub/logs` SignalR → server invokes client method `log(entry)` with `LogEntry` shape:
+- SignalR `/hubs/logs` → server invokes client method `log(entry)` with `LogEntry` shape:
   ```ts
   type LogEntry = {
     ts: string;            // ISO 8601
@@ -50,5 +43,3 @@ npm run format
     props?: Record<string, unknown>;
   };
   ```
-
-The backend team adds `app.UseDefaultFiles().UseStaticFiles()` to `Program.cs` (one line) when the SPA is ready to serve.

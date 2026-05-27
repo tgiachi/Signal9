@@ -10,8 +10,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:5001', changeOrigin: true, secure: false },
-      '/hub': { target: 'http://localhost:5001', changeOrigin: true, secure: false, ws: true },
+      '/api': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
+      '/hubs': { target: 'http://localhost:5017', changeOrigin: true, secure: false, ws: true },
     },
   },
   build: {
