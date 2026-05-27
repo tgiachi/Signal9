@@ -1,29 +1,28 @@
-"use client"
-
-import * as React from "react"
-import * as SwitchPrimitives from "@radix-ui/react-switch"
-
-import { cn } from "@/lib/cn"
+import * as React from 'react';
+import * as SwitchPrimitive from '@radix-ui/react-switch';
+import { cn } from '@/lib/cn';
 
 const Switch = React.forwardRef<
-  React.ElementRef<typeof SwitchPrimitives.Root>,
-  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
+  React.ElementRef<typeof SwitchPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
 >(({ className, ...props }, ref) => (
-  <SwitchPrimitives.Root
+  <SwitchPrimitive.Root
+    ref={ref}
     className={cn(
-      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oklch(0.708 0 0) focus-visible:ring-offset-2 focus-visible:ring-offset-oklch(1 0 0) disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-oklch(0.205 0 0) data-[state=unchecked]:bg-oklch(0.922 0 0) dark:focus-visible:ring-oklch(0.556 0 0) dark:focus-visible:ring-offset-oklch(0.145 0 0) dark:data-[state=checked]:bg-oklch(0.922 0 0) dark:data-[state=unchecked]:bg-oklch(1 0 0 / 15%)",
-      className
+      'peer inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none disabled:opacity-40',
+      'data-[state=checked]:bg-accent-live data-[state=unchecked]:bg-bg-2',
+      className,
     )}
     {...props}
-    ref={ref}
   >
-    <SwitchPrimitives.Thumb
+    <SwitchPrimitive.Thumb
       className={cn(
-        "pointer-events-none block h-4 w-4 rounded-full bg-oklch(1 0 0) shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 dark:bg-oklch(0.145 0 0)"
+        'pointer-events-none block size-3.5 rounded-full bg-bg-5 transition-transform',
+        'data-[state=checked]:translate-x-[14px] data-[state=unchecked]:translate-x-0.5',
       )}
     />
-  </SwitchPrimitives.Root>
-))
-Switch.displayName = SwitchPrimitives.Root.displayName
+  </SwitchPrimitive.Root>
+));
+Switch.displayName = SwitchPrimitive.Root.displayName;
 
-export { Switch }
+export { Switch };
