@@ -27,4 +27,10 @@
     <ProjectReference Include="..\..\src\SignalNine.Web\SignalNine.Web.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures/Ffmpeg/sample.mp4">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
