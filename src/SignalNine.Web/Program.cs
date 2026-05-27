@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi;
 using Serilog;
 using SignalNine.Core.Directories;
@@ -18,6 +20,9 @@ const string SwaggerBearerSchemeName = "Bearer";
 const string SwaggerDocumentName = "v1";
 const string SwaggerTitle = "SignalNine API";
 const string JobsHubPathPrefix = "/hubs/jobs";
+const long ChannelLogoUploadMultipartBodyLengthLimit = 2 * 1024 * 1024;
+const string ChannelLogosDirectoryName = "channel-logos";
+const string ChannelLogosRequestPath = "/assets/channel-logos";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +46,11 @@ builder.Services.AddSingleton(signalNineConfig);
 builder.Services.AddSingleton<IConfigService>(configService);
 builder.Services.AddSingleton<ISerilogService>(serilogService);
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IJellyfinConnectionService, JellyfinConnectionService>();
+builder.Services.AddScoped<IJellyfinService, JellyfinService>();
+builder.Services.AddDataProtection();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient("jellyfin", c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
@@ -73,6 +83,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
            }
        );
 builder.Services.AddAuthorization();
+builder.Services.Configure<FormOptions>(
+    options =>
+    {
+        options.MultipartBodyLengthLimit = ChannelLogoUploadMultipartBodyLengthLimit;
+    }
+);
 builder.Services.AddHealthChecks()
        .AddCheck<FreeSqlHealthCheck>("database");
 
@@ -134,6 +150,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+var channelLogosDirectory = Path.Combine(directoriesConfig[DirectoryType.Assets], ChannelLogosDirectoryName);
+Directory.CreateDirectory(channelLogosDirectory);
+app.UseStaticFiles(
+    new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(channelLogosDirectory),
+        RequestPath = ChannelLogosRequestPath
+    }
+);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks(
@@ -148,6 +173,8 @@ app.MapHealthChecks("/health")
    .AllowAnonymous();
 app.MapAuthenticationEndpoints();
 app.MapConfigEndpoints();
+app.MapJellyfinEndpoints();
+app.MapMediaLibraryEndpoints();
 app.MapChannelEndpoints();
 app.MapChannelMediaEndpoints();
 app.MapTagEndpoints();
