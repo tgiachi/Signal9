@@ -1,3 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useLogStreamContext } from '@/features/logs/log-stream-ctx';
+
 export type AppStatus = {
   connection: 'connected' | 'reconnecting' | 'disconnected';
   configOk: boolean;
@@ -5,5 +8,9 @@ export type AppStatus = {
 };
 
 export function useAppStatus(): AppStatus {
-  return { connection: 'disconnected', configOk: true, errorCount: 0 };
+  const { connection, errorCountLastMinute } = useLogStreamContext();
+  const qc = useQueryClient();
+  const cached = qc.getQueryState(['config']);
+  const configOk = !cached || cached.status !== 'error';
+  return { connection, configOk, errorCount: errorCountLastMinute };
 }
