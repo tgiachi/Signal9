@@ -15,7 +15,9 @@ using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Services;
 using SignalNine.Web.Endpoints;
 using SignalNine.Web.Hubs;
+using SignalNine.Web.Interfaces;
 using SignalNine.Web.Services;
+using SignalNine.Web.Services.Pipeline;
 using SignalNine.Core.Services.Ffmpeg;
 
 const string SwaggerBearerSchemeName = "Bearer";
@@ -25,6 +27,8 @@ const string JobsHubPathPrefix = "/hubs/jobs";
 const long ChannelLogoUploadMultipartBodyLengthLimit = 2 * 1024 * 1024;
 const string ChannelLogosDirectoryName = "channel-logos";
 const string ChannelLogosRequestPath = "/assets/channel-logos";
+const string PreviewsDirectoryName = "previews";
+const string PreviewsRequestPath = "/assets/previews";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +49,7 @@ builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
 builder.Services.AddSingleton(directoriesConfig);
 builder.Services.AddSingleton(signalNineConfig);
+builder.Services.AddSingleton(signalNineConfig.Pipeline);
 builder.Services.AddSingleton<IConfigService>(configService);
 builder.Services.AddSingleton<ISerilogService>(serilogService);
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
@@ -63,6 +68,10 @@ builder.Services.AddSingleton<IFfmpegPool>(sp =>
 builder.Services.AddHostedService<FfmpegPoolBroadcastService>();
 builder.Services.AddSingleton<ILocalLibraryWalker, LocalLibraryWalker>();
 builder.Services.AddSingleton<IJobHandler, LibraryScanJobHandler>();
+builder.Services.AddScoped<IMediaPathResolver, DefaultMediaPathResolver>();
+builder.Services.AddScoped<IPipelineTask, ProbeMediaTask>();
+builder.Services.AddScoped<IPipelineTask, ExtractPreviewsTask>();
+builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
@@ -169,6 +178,15 @@ app.UseStaticFiles(
     {
         FileProvider = new PhysicalFileProvider(channelLogosDirectory),
         RequestPath = ChannelLogosRequestPath
+    }
+);
+var previewsDirectory = Path.Combine(directoriesConfig[DirectoryType.Assets], PreviewsDirectoryName);
+Directory.CreateDirectory(previewsDirectory);
+app.UseStaticFiles(
+    new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(previewsDirectory),
+        RequestPath = PreviewsRequestPath
     }
 );
 app.UseAuthentication();
