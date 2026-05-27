@@ -15,7 +15,7 @@ export function AppShell() {
   const configSummary = readConfigSummary(config.text);
 
   return (
-    <div className="flex h-full min-h-0 bg-bg-0 text-fg-0 max-md:flex-col">
+    <div className="flex h-full min-h-0 bg-bg-0 text-fg-1 max-md:flex-col">
       <NavTabs />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <StatusBar
