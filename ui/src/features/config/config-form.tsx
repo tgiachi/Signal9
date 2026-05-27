@@ -33,7 +33,12 @@ function emptyForField(f: FieldSpec): TomlValue {
 function getValue(data: ConfigDocument, path: readonly string[]): TomlValue | undefined {
   let current: TomlValue | undefined = data;
   for (const segment of path) {
-    if (!current || typeof current !== 'object' || current instanceof Date || Array.isArray(current)) {
+    if (
+      !current ||
+      typeof current !== 'object' ||
+      current instanceof Date ||
+      Array.isArray(current)
+    ) {
       return undefined;
     }
     current = current[segment];
@@ -41,7 +46,11 @@ function getValue(data: ConfigDocument, path: readonly string[]): TomlValue | un
   return current;
 }
 
-function setValue(data: ConfigDocument, path: readonly string[], value: TomlValue): ConfigDocument {
+function setValue(
+  data: ConfigDocument,
+  path: readonly string[],
+  value: TomlValue,
+): ConfigDocument {
   const [head, ...rest] = path;
   if (!head) return data;
 
@@ -81,7 +90,7 @@ export function ConfigForm({ initialText, onSave, isSaving }: Props) {
       <div className="flex min-h-0 flex-1">
         <ConfigSectionNav activeKey={activeKey} onChange={setActiveKey} />
         <div className="flex-1 overflow-auto p-5">
-          <h2 className="mb-4 font-mono text-[10px] uppercase tracking-label text-fg-1">
+          <h2 className="mb-4 font-mono text-[10px] uppercase tracking-label text-fg-3">
             {section.label}
           </h2>
           <div className="flex flex-col gap-4">
@@ -96,12 +105,12 @@ export function ConfigForm({ initialText, onSave, isSaving }: Props) {
           </div>
         </div>
       </div>
-      <footer className="flex items-center justify-end gap-2 border-t border-border bg-bg-2 px-3 py-2">
+      <footer className="flex items-center justify-end gap-2 bg-bg-4 px-3 py-2">
         <button
           type="button"
           onClick={() => setData(structuredClone(initial))}
           disabled={!dirty || isSaving}
-          className="rounded border border-border bg-bg-3 px-3 py-1 text-[11px] text-fg-0 disabled:opacity-40"
+          className="rounded-[6px] bg-bg-2 px-3 py-1.5 text-[11px] text-fg-1 transition hover:bg-[#343b41] disabled:opacity-40"
         >
           Discard
         </button>
@@ -109,7 +118,7 @@ export function ConfigForm({ initialText, onSave, isSaving }: Props) {
           type="button"
           onClick={() => onSave(stringifyToml(data))}
           disabled={!dirty || isSaving}
-          className="rounded border border-on-air bg-on-air px-3 py-1 text-[11px] font-semibold text-black disabled:opacity-40"
+          className="rounded-[6px] bg-accent-live px-3 py-1.5 text-[11px] font-semibold text-bg-5 transition hover:bg-accent-live-hover disabled:opacity-40"
         >
           {isSaving ? 'Saving…' : 'Save & Reload'}
         </button>
@@ -130,7 +139,7 @@ function FieldRow({
   const id = `cfg-${spec.path.join('-')}`;
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="font-mono text-[10px] uppercase tracking-label text-fg-1">
+      <label htmlFor={id} className="font-mono text-[10px] uppercase tracking-label text-fg-3">
         {spec.label}
       </label>
       {spec.type === 'select' && spec.options && (
@@ -141,7 +150,7 @@ function FieldRow({
             const option = spec.options?.find((item) => String(item.value) === e.target.value);
             onChange(option?.value ?? e.target.value);
           }}
-          className="w-full max-w-[28rem] rounded border border-border bg-bg-0 px-2 py-1.5 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
+          className="w-full max-w-[28rem] rounded-[6px] bg-bg-1 px-2 py-1.5 font-mono text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
         >
           {spec.options.map((o) => (
             <option key={String(o.value)} value={String(o.value)}>
@@ -155,7 +164,7 @@ function FieldRow({
           id={id}
           value={String(value)}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full max-w-[28rem] rounded border border-border bg-bg-0 px-2 py-1.5 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
+          className="w-full max-w-[28rem] rounded-[6px] bg-bg-1 px-2 py-1.5 font-mono text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
         />
       )}
       {spec.type === 'number' && (
@@ -164,7 +173,7 @@ function FieldRow({
           type="number"
           value={Number(value)}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-36 rounded border border-border bg-bg-0 px-2 py-1.5 font-mono text-[12px] text-fg-0 focus:border-on-air focus:outline-none"
+          className="w-36 rounded-[6px] bg-bg-1 px-2 py-1.5 font-mono text-[12px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
         />
       )}
       {spec.type === 'boolean' && (
@@ -173,10 +182,10 @@ function FieldRow({
           type="checkbox"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4"
+          className="h-4 w-4 accent-accent-live"
         />
       )}
-      {spec.help && <p className="font-mono text-[10px] text-fg-2">{spec.help}</p>}
+      {spec.help && <p className="font-mono text-[10px] text-fg-3">{spec.help}</p>}
     </div>
   );
 }
