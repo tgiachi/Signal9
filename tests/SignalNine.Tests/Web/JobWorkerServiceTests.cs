@@ -18,7 +18,7 @@ public class JobWorkerServiceTests
     {
         var handler = new FakeJobHandler();
         var manager = new InMemoryJobManager(CreateConfig(), new NoOpJobNotificationPublisher(), new InMemoryJobQueue(), new JobTypeRouter());
-        var service = new JobWorkerService(CreateConfig(), [handler], manager);
+        var service = new JobWorkerService(CreateConfig(), [handler], manager, JobStreamTarget.Workers);
         using var timeoutSource = new CancellationTokenSource(TestTimeout);
 
         await service.StartAsync(timeoutSource.Token);
