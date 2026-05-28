@@ -19,4 +19,6 @@ public class SignalNineConfig
     public FfmpegPoolConfig FfmpegPool { get; set; } = new();
 
     public PipelineConfig Pipeline { get; set; } = new();
+
+    public RedisConfig Redis { get; set; } = new();
 }
