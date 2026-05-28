@@ -104,12 +104,13 @@ export function ChannelMediaPage() {
         />
 
         <div className="min-h-0 flex-1 overflow-auto bg-bg-0">
-          <div className="grid min-w-[74rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(16rem,1.1fr)_8rem_10rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
+          <div className="grid min-w-[80rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
             <span>Preview</span>
             <span>Title</span>
             <span>Media type</span>
             <span>Duration</span>
             <span>Source</span>
+            <span>Tags</span>
             <span>Status</span>
             <span>Actions</span>
           </div>
@@ -188,7 +189,7 @@ function MediaRow({
   return (
     <div
       className={
-        'grid min-w-[74rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(16rem,1.1fr)_8rem_10rem] items-center gap-3 px-3 py-3 ' +
+        'grid min-w-[80rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] items-center gap-3 px-3 py-3 ' +
         (index % 2 ? 'bg-bg-3' : 'bg-bg-2')
       }
     >
@@ -208,6 +209,21 @@ function MediaRow({
       <span className="break-all font-mono text-[12px] text-fg-2">
         {sourceTypeLabel(media.sourceType)} · {media.sourceRef ?? 'none'}
       </span>
+      <div className="flex min-w-0 flex-wrap gap-1">
+        {media.tags.length === 0 ? (
+          <span className="font-mono text-[10px] text-fg-3">—</span>
+        ) : (
+          media.tags.map((tag) => (
+            <span
+              key={tag.id}
+              title={tag.label ?? tag.name}
+              className="truncate rounded-[3px] bg-accent-cfg px-1.5 py-0.5 font-mono text-[10px] font-semibold text-fg-0"
+            >
+              {tag.label ?? tag.name}
+            </span>
+          ))
+        )}
+      </div>
       <span
         className={
           'w-fit rounded-[3px] px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-label ' +

@@ -5,6 +5,12 @@ import {
   mediaSourceTypeLabel,
 } from '@/features/media-libraries/media-library-types';
 
+export type TagSummary = {
+  id: string;
+  name: string;
+  label: string | null;
+};
+
 export type ChannelMediaResponse = {
   id: string;
   type: ChannelMediaType;
@@ -23,6 +29,7 @@ export type ChannelMediaResponse = {
   informationEdition: string | null;
   createdAt: string;
   updatedAt: string;
+  tags: TagSummary[];
 };
 
 export function mediaTypeLabel(type: ChannelMediaType): string {
