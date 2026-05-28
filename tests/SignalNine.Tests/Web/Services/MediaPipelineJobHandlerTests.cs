@@ -1,443 +1,229 @@
-using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
+using SignalNine.Core.Data.Config;
+using SignalNine.Core.Data.Ffmpeg;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Jobs.Results;
 using SignalNine.Core.Data.Pipeline;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services;
+using SignalNine.Core.Services.Ffmpeg;
 using SignalNine.Core.Types;
-using SignalNine.Persistence.Entities.Channels;
-using SignalNine.Persistence.Interfaces;
-using SignalNine.Persistence.Types;
-using SignalNine.Jobs.Data.Pipeline;
-using SignalNine.Jobs.Interfaces;
 using SignalNine.Jobs.Services;
+using SignalNine.Jobs.Services.Pipeline;
+using System.Text.Json;
 
 namespace SignalNine.Tests.Web.Services;
 
-public class MediaPipelineJobHandlerTests
+public class MediaPipelineJobHandlerTests : IDisposable
 {
-    private static (
-        MediaPipelineJobHandler Handler,
-        StubMediaAccess Media,
-        StubLibAccess Libs,
-        StubResolver Resolver,
-        List<RecordingTask> Tasks,
-        StubJobs Jobs
-    ) Build(params RecordingTask[] tasks)
+    private readonly string _tempBase;
+
+    public MediaPipelineJobHandlerTests()
     {
-        var media = new StubMediaAccess();
-        var libs = new StubLibAccess();
-        var resolver = new StubResolver();
-        var jobs = new StubJobs();
-        var taskList = tasks.ToList();
-
-        var services = new ServiceCollection();
-        services.AddScoped<IDataAccess<ChannelMediaEntity>>(_ => media);
-        services.AddScoped<IDataAccess<MediaLibraryEntity>>(_ => libs);
-        services.AddScoped<IMediaPathResolver>(_ => resolver);
-        services.AddScoped<IJobManager>(_ => jobs);
-        foreach (var t in taskList)
-        {
-            var captured = t;
-            services.AddScoped<IPipelineTask>(_ => captured);
-        }
-        var sp = services.BuildServiceProvider();
-
-        var handler = new MediaPipelineJobHandler(sp.GetRequiredService<IServiceScopeFactory>());
-        return (handler, media, libs, resolver, taskList, jobs);
+        _tempBase = Path.Combine(Path.GetTempPath(), $"pipeline-handler-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempBase);
     }
 
-    private static JobExecutionContext NewContext(Guid mediaId)
+    private string CreateWorkDir()
     {
-        var payload = JsonSerializer.Serialize(new MediaPipelinePayload(mediaId));
-        var workDir = Path.Combine(Path.GetTempPath(), $"signalnine-tests-{Guid.NewGuid():N}");
+        var workDir = Path.Combine(_tempBase, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(workDir, "input"));
+        return workDir;
+    }
+
+    private static string WriteInputFile(string workDir, string relativePath = "input/movie.mp4")
+    {
+        var inputPath = Path.Combine(workDir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(inputPath)!);
+        File.WriteAllText(inputPath, "fake-bytes");
+        return inputPath;
+    }
+
+    private static JobExecutionContext NewContext(string workDir, Guid channelMediaId, string inputFile = "input/movie.mp4", int previewCount = 5)
+    {
+        var payload = JsonSerializer.Serialize(new MediaPipelinePayloadV2(channelMediaId, inputFile, previewCount));
         return new JobExecutionContext(Guid.NewGuid(), payload, workDir, new InMemoryJobBus());
     }
 
-    private static MediaLibraryEntity NewLib()
+    private static (ProbeMediaTask Probe, ExtractPreviewsTask Extract, StubPool Pool) BuildTasks(
+        TimeSpan? probeDuration = null,
+        int thumbCount = 5)
     {
-        return new MediaLibraryEntity
+        var pool = new StubPool(thumbCount: thumbCount, probeDuration: probeDuration);
+        var config = new PipelineConfig();
+        var probe = new ProbeMediaTask(pool, config);
+        var extract = new ExtractPreviewsTask(pool);
+        return (probe, extract, pool);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HappyPath_ReturnsCorrectResult()
+    {
+        var workDir = CreateWorkDir();
+        WriteInputFile(workDir);
+        var channelMediaId = Guid.NewGuid();
+        var (probe, extract, _) = BuildTasks(probeDuration: TimeSpan.FromSeconds(300), thumbCount: 5);
+        var handler = new MediaPipelineJobHandler(probe, extract);
+        var context = NewContext(workDir, channelMediaId, previewCount: 5);
+
+        var result = (MediaPipelineResult)await handler.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Equal(channelMediaId, result.ChannelMediaId);
+        Assert.Equal(300, result.DurationSeconds);
+        Assert.Equal(5, result.PreviewFiles.Count);
+        Assert.NotNull(result.ProbeJson);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MissingInputFile_ThrowsFileNotFoundException()
+    {
+        var workDir = CreateWorkDir();
+        // Do NOT create the input file
+        var channelMediaId = Guid.NewGuid();
+        var (probe, extract, _) = BuildTasks(probeDuration: TimeSpan.FromSeconds(120), thumbCount: 3);
+        var handler = new MediaPipelineJobHandler(probe, extract);
+        var context = NewContext(workDir, channelMediaId);
+
+        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            handler.ExecuteAsync(context, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NullProbeDuration_ResultDurationSecondIsNull()
+    {
+        var workDir = CreateWorkDir();
+        WriteInputFile(workDir);
+        var channelMediaId = Guid.NewGuid();
+        // probeDuration null => ProbeMediaTask returns null DurationSeconds, and ExtractPreviewsTask
+        // will call probe again (pool still returns null) => returns empty list
+        var (probe, extract, _) = BuildTasks(probeDuration: null, thumbCount: 0);
+        var handler = new MediaPipelineJobHandler(probe, extract);
+        var context = NewContext(workDir, channelMediaId, previewCount: 5);
+
+        var result = (MediaPipelineResult)await handler.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Null(result.DurationSeconds);
+        Assert.Empty(result.PreviewFiles);
+        Assert.Null(result.ProbeJson);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PreCanceledToken_ThrowsOperationCanceledException()
+    {
+        var workDir = CreateWorkDir();
+        WriteInputFile(workDir);
+        var channelMediaId = Guid.NewGuid();
+        var (probe, extract, _) = BuildTasks(probeDuration: TimeSpan.FromSeconds(60), thumbCount: 5);
+        var handler = new MediaPipelineJobHandler(probe, extract);
+        var context = NewContext(workDir, channelMediaId);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.ExecuteAsync(context, cts.Token));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EmptyPayloadJson_ThrowsInvalidOperationException()
+    {
+        var workDir = CreateWorkDir();
+        var (probe, extract, _) = BuildTasks();
+        var handler = new MediaPipelineJobHandler(probe, extract);
+        // "null" deserializes to null → throws InvalidOperationException("Empty pipeline payload.")
+        var context = new JobExecutionContext(Guid.NewGuid(), "null", workDir, new InMemoryJobBus());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.ExecuteAsync(context, CancellationToken.None));
+
+        Assert.Contains("Empty pipeline payload.", ex.Message);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_tempBase))
         {
-            Id = Guid.NewGuid(),
-            Name = "L",
-            DefaultMediaType = ChannelMediaType.Movies,
-            SourceType = MediaSourceType.LocalFile,
-            SourceRef = "/m",
-            IsActive = true
-        };
-    }
-
-    private static ChannelMediaEntity NewMedia(Guid libraryId)
-    {
-        return new ChannelMediaEntity
-        {
-            Id = Guid.NewGuid(),
-            Type = ChannelMediaType.Movies,
-            Title = "T",
-            SourceType = MediaSourceType.LocalFile,
-            SourceRef = "a.mp4",
-            IsActive = true,
-            MediaLibraryId = libraryId
-        };
-    }
-
-    [Fact]
-    public async Task Execute_OrdersTasksAscending()
-    {
-        var t100 = new RecordingTask("a", 100, true);
-        var t50 = new RecordingTask("b", 50, true);
-        var t200 = new RecordingTask("c", 200, true);
-
-        var (handler, media, libs, _, _, _) = Build(t100, t50, t200);
-        var lib = NewLib();
-        var entity = NewMedia(lib.Id);
-        libs.Add(lib);
-        media.Add(entity);
-
-        await handler.ExecuteAsync(NewContext(entity.Id), CancellationToken.None);
-
-        Assert.True(t50.ExecutedAt < t100.ExecutedAt);
-        Assert.True(t100.ExecutedAt < t200.ExecutedAt);
-        Assert.True(t50.Executed && t100.Executed && t200.Executed);
-    }
-
-    [Fact]
-    public async Task Execute_SkipsDisabledTasks()
-    {
-        var enabled = new RecordingTask("on", 10, true);
-        var disabled = new RecordingTask("off", 20, false);
-
-        var (handler, media, libs, _, _, _) = Build(enabled, disabled);
-        var lib = NewLib();
-        var entity = NewMedia(lib.Id);
-        libs.Add(lib);
-        media.Add(entity);
-
-        await handler.ExecuteAsync(NewContext(entity.Id), CancellationToken.None);
-
-        Assert.True(enabled.Executed);
-        Assert.False(disabled.Executed);
-    }
-
-    [Fact]
-    public async Task Execute_FailingTask_LoggedAndContinues()
-    {
-        var failing = new RecordingTask("bad", 10, true) { ThrowOnExecute = new InvalidOperationException("boom") };
-        var next = new RecordingTask("good", 20, true);
-
-        var (handler, media, libs, _, _, jobs) = Build(failing, next);
-        var lib = NewLib();
-        var entity = NewMedia(lib.Id);
-        libs.Add(lib);
-        media.Add(entity);
-
-        await handler.ExecuteAsync(NewContext(entity.Id), CancellationToken.None);
-
-        Assert.True(next.Executed);
-        Assert.Single(jobs.Logs);
-        Assert.Contains("bad", jobs.Logs[0]);
-        Assert.Contains("boom", jobs.Logs[0]);
-        Assert.Equal(JobLogLevelType.Warning, jobs.LogLevels[0]);
-    }
-
-    [Fact]
-    public async Task Execute_MediaMissing_Throws()
-    {
-        var (handler, _, libs, _, _, _) = Build();
-        var lib = NewLib();
-        libs.Add(lib);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.ExecuteAsync(NewContext(Guid.NewGuid()), CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task Execute_LibraryMissing_Throws()
-    {
-        var (handler, media, _, _, _, _) = Build();
-        var entity = NewMedia(Guid.NewGuid());
-        media.Add(entity);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.ExecuteAsync(NewContext(entity.Id), CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task Execute_PathResolverThrows_BubblesUp()
-    {
-        var (handler, media, libs, resolver, _, _) = Build();
-        var lib = NewLib();
-        var entity = NewMedia(lib.Id);
-        libs.Add(lib);
-        media.Add(entity);
-        resolver.ThrowMessage = "no path";
-
-        await Assert.ThrowsAsync<MediaPathResolutionException>(() =>
-            handler.ExecuteAsync(NewContext(entity.Id), CancellationToken.None));
-    }
-
-    private sealed class RecordingTask : IPipelineTask
-    {
-        private static int _counter;
-
-        public string Name { get; }
-        public int Order { get; }
-        public bool IsEnabled { get; }
-        public bool Executed { get; private set; }
-        public int ExecutedAt { get; private set; }
-        public Exception? ThrowOnExecute { get; set; }
-
-        public RecordingTask(string name, int order, bool enabled)
-        {
-            Name = name;
-            Order = order;
-            IsEnabled = enabled;
-        }
-
-        public Task ExecuteAsync(PipelineContext context, CancellationToken ct)
-        {
-            Executed = true;
-            ExecutedAt = Interlocked.Increment(ref _counter);
-            if (ThrowOnExecute is not null)
+            try
             {
-                throw ThrowOnExecute;
+                Directory.Delete(_tempBase, recursive: true);
             }
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class StubResolver : IMediaPathResolver
-    {
-        public string? ThrowMessage { get; set; }
-
-        public Task<string> ResolveAsync(ChannelMediaEntity media, MediaLibraryEntity library, CancellationToken ct)
-        {
-            if (ThrowMessage is not null)
+            catch
             {
-                throw new MediaPathResolutionException(ThrowMessage);
+                // best effort cleanup
             }
-            return Task.FromResult($"/resolved/{media.SourceRef}");
         }
+        GC.SuppressFinalize(this);
     }
 
-    private sealed class StubMediaAccess : IDataAccess<ChannelMediaEntity>
+    private sealed class StubPool : IFfmpegPool
     {
-        private readonly List<ChannelMediaEntity> _rows = new();
-        public List<ChannelMediaEntity> Updated { get; } = new();
+        private readonly int _thumbCount;
+        private readonly TimeSpan? _probeDuration;
 
-        public void Add(ChannelMediaEntity e)
+        public event EventHandler<FfmpegProcessSnapshot>? ProcessChanged;
+
+        public StubPool(int thumbCount, TimeSpan? probeDuration)
         {
-            _rows.Add(e);
+            _thumbCount = thumbCount;
+            _probeDuration = probeDuration;
         }
 
-        public ChannelMediaEntity? GetByKey(object key)
+        public Task<FfprobeResult> ProbeAsync(string inputPath, CancellationToken ct = default)
         {
-            return _rows.FirstOrDefault(r => r.Id.Equals(key));
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(new FfprobeResult(_probeDuration, null, null, Array.Empty<FfprobeStream>()));
         }
 
-        public IReadOnlyList<ChannelMediaEntity> List()
+        public Task<FfmpegProcessHandle> RunAsync(
+            FfmpegInvocation invocation,
+            IProgress<FfmpegProgressUpdate>? progress = null,
+            CancellationToken ct = default)
         {
-            return _rows;
+            ct.ThrowIfCancellationRequested();
+
+            if (_thumbCount > 0)
+            {
+                var patternArg = invocation.Arguments[^1];
+                var dir = Path.GetDirectoryName(patternArg);
+                if (dir is not null && Directory.Exists(dir))
+                {
+                    for (var i = 1; i <= _thumbCount; i++)
+                    {
+                        File.WriteAllBytes(Path.Combine(dir, $"thumb-{i:D3}.jpg"), Array.Empty<byte>());
+                    }
+                }
+            }
+
+            var snapshot = new FfmpegProcessSnapshot(
+                Guid.NewGuid(),
+                1,
+                invocation.Executable,
+                invocation.Arguments,
+                FfmpegProcessStatusType.Completed,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                0,
+                null,
+                Array.Empty<string>(),
+                null
+            );
+            var completion = Task.FromResult(snapshot);
+            return Task.FromResult(new FfmpegProcessHandle(snapshot.Id, completion, () => Task.FromResult(false)));
         }
 
-        public ChannelMediaEntity Insert(ChannelMediaEntity entity)
+        public IReadOnlyList<FfmpegProcessSnapshot> List()
         {
-            _rows.Add(entity);
-            return entity;
+            return Array.Empty<FfmpegProcessSnapshot>();
         }
 
-        public int Update(ChannelMediaEntity entity)
-        {
-            Updated.Add(entity);
-            return 1;
-        }
-
-        public int Delete(object key)
-        {
-            return _rows.RemoveAll(r => r.Id.Equals(key));
-        }
-    }
-
-    private sealed class StubLibAccess : IDataAccess<MediaLibraryEntity>
-    {
-        private readonly List<MediaLibraryEntity> _rows = new();
-
-        public void Add(MediaLibraryEntity e)
-        {
-            _rows.Add(e);
-        }
-
-        public MediaLibraryEntity? GetByKey(object key)
-        {
-            return _rows.FirstOrDefault(r => r.Id.Equals(key));
-        }
-
-        public IReadOnlyList<MediaLibraryEntity> List()
-        {
-            return _rows;
-        }
-
-        public MediaLibraryEntity Insert(MediaLibraryEntity entity)
-        {
-            _rows.Add(entity);
-            return entity;
-        }
-
-        public int Update(MediaLibraryEntity entity)
-        {
-            return 1;
-        }
-
-        public int Delete(object key)
-        {
-            return _rows.RemoveAll(r => r.Id.Equals(key));
-        }
-    }
-
-    private sealed class StubJobs : IJobManager
-    {
-        public List<string> Logs { get; } = new();
-        public List<JobLogLevelType> LogLevels { get; } = new();
-
-        public Task<JobSnapshot> EnqueueAsync(EnqueueJobCommand command, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public IReadOnlyList<JobSnapshot> List()
-        {
-            return Array.Empty<JobSnapshot>();
-        }
-
-        public JobSnapshot? GetById(Guid jobId)
+        public FfmpegProcessSnapshot? Get(Guid id)
         {
             return null;
         }
 
-        public IReadOnlyList<JobLogEntry> GetLogs(Guid jobId)
-        {
-            return Array.Empty<JobLogEntry>();
-        }
-
-        public Task<bool> CancelAsync(Guid jobId, CancellationToken cancellationToken = default)
+        public Task<bool> CancelAsync(Guid processId, CancellationToken ct = default)
         {
             return Task.FromResult(false);
         }
-
-        public ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task CompleteAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task FailAsync(Guid jobId, Exception exception, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task MarkCanceledAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task ReportProgressAsync(Guid jobId, int percent, string message, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task WriteLogAsync(Guid jobId, JobLogLevelType level, string message, CancellationToken cancellationToken = default)
-        {
-            Logs.Add(message);
-            LogLevels.Add(level);
-            return Task.CompletedTask;
-        }
-
-        public CancellationToken GetCancellationToken(Guid jobId)
-        {
-            return CancellationToken.None;
-        }
-
-        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
-            => DequeueAsync(cancellationToken);
-    }
-
-    private sealed class NoopJobManager : IJobManager
-    {
-        public Task<JobSnapshot> EnqueueAsync(EnqueueJobCommand command, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public IReadOnlyList<JobSnapshot> List()
-        {
-            return Array.Empty<JobSnapshot>();
-        }
-
-        public JobSnapshot? GetById(Guid jobId)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<JobLogEntry> GetLogs(Guid jobId)
-        {
-            return Array.Empty<JobLogEntry>();
-        }
-
-        public Task<bool> CancelAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(false);
-        }
-
-        public ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task CompleteAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task FailAsync(Guid jobId, Exception exception, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task MarkCanceledAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task ReportProgressAsync(Guid jobId, int percent, string message, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task WriteLogAsync(Guid jobId, JobLogLevelType level, string message, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public CancellationToken GetCancellationToken(Guid jobId)
-        {
-            return CancellationToken.None;
-        }
-
-        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
-            => DequeueAsync(cancellationToken);
     }
 }
