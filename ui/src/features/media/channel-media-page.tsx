@@ -11,8 +11,18 @@ import {
   mediaTypeLabel,
   previewUrl,
   sourceTypeLabel,
+  streamUrl,
   type ChannelMediaResponse,
 } from './channel-media-types';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogCloseIcon,
+  DialogHeader,
+} from '@/components/ui/dialog';
+import { useAuth } from '@/providers/auth-context';
 import { useChannelMedia } from './use-channel-media';
 
 export function ChannelMediaPage() {
@@ -20,6 +30,7 @@ export function ChannelMediaPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | string>('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | string>('all');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [playing, setPlaying] = useState<ChannelMediaResponse | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -116,12 +127,48 @@ export function ChannelMediaPage() {
                 index={idx}
                 onRunPipeline={runPipeline}
                 isRunning={channelMedia.isRunningPipeline}
+                onPlay={setPlaying}
               />
             ))
           )}
         </div>
       </section>
+      <MediaPlayerDialog media={playing} onOpenChange={(open) => !open && setPlaying(null)} />
     </div>
+  );
+}
+
+function MediaPlayerDialog({
+  media,
+  onOpenChange,
+}: {
+  media: ChannelMediaResponse | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const auth = useAuth();
+  const open = media !== null;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl bg-bg-5 p-0">
+        <DialogHeader>
+          <DialogTitle className="truncate">{media?.title ?? ''}</DialogTitle>
+          <DialogCloseIcon />
+        </DialogHeader>
+        <DialogDescription className="sr-only">
+          Inline video player for the selected media item.
+        </DialogDescription>
+        {open && media ? (
+          <video
+            key={media.id}
+            controls
+            autoPlay
+            preload="metadata"
+            src={streamUrl(media.id, auth.token)}
+            className="aspect-video w-full bg-black"
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -130,11 +177,13 @@ function MediaRow({
   index,
   onRunPipeline,
   isRunning,
+  onPlay,
 }: {
   media: ChannelMediaResponse;
   index: number;
   onRunPipeline: (media: ChannelMediaResponse) => void;
   isRunning: boolean;
+  onPlay: (media: ChannelMediaResponse) => void;
 }) {
   return (
     <div
@@ -143,7 +192,11 @@ function MediaRow({
         (index % 2 ? 'bg-bg-3' : 'bg-bg-2')
       }
     >
-      <PreviewCarousel mediaId={media.id} title={media.title} />
+      <PreviewCarousel
+        mediaId={media.id}
+        title={media.title}
+        onClick={() => onPlay(media)}
+      />
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-fg-0">{media.title}</div>
         <div className="truncate text-[12px] text-fg-3">{typeMetadata(media)}</div>
@@ -243,7 +296,15 @@ function FilterBar({
 const MAX_PREVIEW_COUNT = 5;
 const PREVIEW_ROTATE_MS = 300;
 
-function PreviewCarousel({ mediaId, title }: { mediaId: string; title: string }) {
+function PreviewCarousel({
+  mediaId,
+  title,
+  onClick,
+}: {
+  mediaId: string;
+  title: string;
+  onClick?: () => void;
+}) {
   const [index, setIndex] = useState(1);
   const [hovering, setHovering] = useState(false);
   const [invalid, setInvalid] = useState<Set<number>>(() => new Set());
@@ -268,7 +329,23 @@ function PreviewCarousel({ mediaId, title }: { mediaId: string; title: string })
   return (
     <div
       data-testid="preview-carousel"
-      className="group relative h-12 w-20 overflow-hidden rounded-[4px] bg-bg-1"
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `Play ${title}` : undefined}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      className={
+        'group relative h-12 w-20 overflow-hidden rounded-[4px] bg-bg-1 ' +
+        (onClick
+          ? 'cursor-pointer transition hover:ring-2 hover:ring-accent-live focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-live'
+          : '')
+      }
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => {
         setHovering(false);
