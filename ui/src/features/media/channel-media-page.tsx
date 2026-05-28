@@ -127,7 +127,7 @@ export function ChannelMediaPage() {
         />
 
         <div className="min-h-0 flex-1 overflow-auto bg-bg-0">
-          <div className="grid min-w-[80rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
+          <div className="grid min-w-[82rem] grid-cols-[8rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
             <span>Preview</span>
             <span>Title</span>
             <span>Media type</span>
@@ -304,7 +304,7 @@ function MediaRow({
   return (
     <div
       className={
-        'grid min-w-[80rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] items-center gap-3 px-3 py-3 ' +
+        'grid min-w-[82rem] grid-cols-[8rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] items-center gap-3 px-3 py-3 ' +
         (index % 2 ? 'bg-bg-3' : 'bg-bg-2')
       }
     >
@@ -496,7 +496,7 @@ function PreviewCarousel({
         }
       }}
       className={
-        'group relative h-12 w-20 overflow-hidden rounded-[4px] bg-bg-1 ' +
+        'group relative h-16 w-28 overflow-hidden rounded-[4px] bg-bg-1 ' +
         (onClick
           ? 'cursor-pointer transition hover:ring-2 hover:ring-accent-live focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-live'
           : '')
