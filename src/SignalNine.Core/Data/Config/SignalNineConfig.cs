@@ -21,4 +21,8 @@ public class SignalNineConfig
     public PipelineConfig Pipeline { get; set; } = new();
 
     public RedisConfig Redis { get; set; } = new();
+
+    public WorkSpaceConfig WorkSpace { get; set; } = new();
+
+    public FinalStorageConfig FinalStorage { get; set; } = new();
 }

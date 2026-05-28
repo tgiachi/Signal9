@@ -5,6 +5,7 @@ namespace SignalNine.Core.Toml;
 
 [TomlSourceGenerationOptions(WriteIndented = true)]
 [TomlSerializable(typeof(FfmpegPoolConfig))]
+[TomlSerializable(typeof(FinalStorageConfig))]
 [TomlSerializable(typeof(JobSystemConfig))]
 [TomlSerializable(typeof(JwtConfig))]
 [TomlSerializable(typeof(PipelineConfig))]
@@ -16,6 +17,7 @@ namespace SignalNine.Core.Toml;
 [TomlSerializable(typeof(PipelineTasksConfig))]
 [TomlSerializable(typeof(RedisConfig))]
 [TomlSerializable(typeof(SignalNineConfig))]
+[TomlSerializable(typeof(WorkSpaceConfig))]
 internal sealed partial class SignalNineTomlContext : TomlSerializerContext
 {
 }
