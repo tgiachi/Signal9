@@ -23,8 +23,59 @@ public class ConfigSchemaService
         AddJobSystemSchema(document);
         AddFfmpegPoolSchema(document);
         AddPipelineSchema(document);
+        AddWorkSpaceSchema(document);
+        AddFinalStorageSchema(document);
 
         return document;
+    }
+
+    private static void AddWorkSpaceSchema(ConfigSchemaDocument document)
+    {
+        document.Properties["WorkSpace"] = ObjectNode(
+            "Workspace",
+            Ui("workspace", "Workspace", 600),
+            new Dictionary<string, ConfigSchemaNode>
+            {
+                ["Path"] = StringNode(
+                    "Scratch path",
+                    "{ROOT_DIRECTORY}/work",
+                    Ui(order: 100)
+                ),
+                ["CleanupAfterProcessing"] = BooleanNode(
+                    "Cleanup after processing",
+                    true,
+                    Ui(order: 110)
+                ),
+                ["OrphanCleanupHours"] = IntegerNode(
+                    "Orphan cleanup hours",
+                    24,
+                    Ui(order: 120),
+                    "Janitor reaps job scratch dirs older than this many hours.",
+                    1
+                )
+            }
+        );
+    }
+
+    private static void AddFinalStorageSchema(ConfigSchemaDocument document)
+    {
+        document.Properties["FinalStorage"] = ObjectNode(
+            "Final storage",
+            Ui("storage", "Final storage", 700),
+            new Dictionary<string, ConfigSchemaNode>
+            {
+                ["Type"] = StringNode(
+                    "Backend",
+                    "filesystem",
+                    Ui(order: 100)
+                ),
+                ["Path"] = StringNode(
+                    "Filesystem path",
+                    "{ROOT_DIRECTORY}/assets",
+                    Ui(order: 110)
+                )
+            }
+        );
     }
 
     private void AddPipelineSchema(ConfigSchemaDocument document)
