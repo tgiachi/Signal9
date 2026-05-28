@@ -1,70 +1,45 @@
-using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Ffmpeg;
-using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
-using SignalNine.Persistence.Types;
-using SignalNine.Jobs.Data.Pipeline;
-using SignalNine.Jobs.Interfaces;
 
 namespace SignalNine.Jobs.Services.Pipeline;
 
-public class ExtractPreviewsTask : IPipelineTask
+public class ExtractPreviewsTask
 {
-    private const string PreviewsRootName = "previews";
     private const string ThumbnailPattern = "thumb-%03d.jpg";
     private const string ExistingThumbnailPattern = "thumb-*.jpg";
     private const string FfmpegExecutable = "ffmpeg";
 
     private readonly IFfmpegPool _pool;
-    private readonly DirectoriesConfig _directories;
-    private readonly PipelineConfig _config;
 
-    public string Name => "preview";
-    public int Order => 200;
-    public bool IsEnabled => _config.Tasks.Preview.Enabled;
-
-    public ExtractPreviewsTask(
-        IFfmpegPool pool,
-        DirectoriesConfig directories,
-        PipelineConfig config)
+    public ExtractPreviewsTask(IFfmpegPool pool)
     {
         ArgumentNullException.ThrowIfNull(pool);
-        ArgumentNullException.ThrowIfNull(directories);
-        ArgumentNullException.ThrowIfNull(config);
-
         _pool = pool;
-        _directories = directories;
-        _config = config;
     }
 
-    public async Task ExecuteAsync(PipelineContext context, CancellationToken ct)
+    public async Task<IReadOnlyList<string>> RunAsync(
+        string inputPath,
+        string outputDir,
+        int count,
+        int? durationSecondsHint,
+        CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(inputPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDir);
 
-        var outputDir = Path.Combine(
-            _directories[DirectoryType.Assets],
-            PreviewsRootName,
-            context.Media.Id.ToString()
-        );
-        if (!_config.Tasks.Preview.OverwriteExisting && HasExistingPreview(outputDir))
+        if (count <= 0)
         {
-            return;
+            return Array.Empty<string>();
         }
 
-        if (context.Media.SourceType == MediaSourceType.Jellyfin &&
-            !_config.Tasks.Preview.AllowJellyfinStreamFallback)
+        var durationSeconds = durationSecondsHint;
+        if (durationSeconds is null || durationSeconds.Value <= 0)
         {
-            return;
-        }
-
-        var durationSeconds = context.Media.DurationSeconds;
-        if (durationSeconds is null)
-        {
-            var probe = await _pool.ProbeAsync(context.ResolvedPath, ct).ConfigureAwait(false);
+            var probe = await _pool.ProbeAsync(inputPath, ct).ConfigureAwait(false);
             if (probe.Duration is null || probe.Duration.Value.TotalSeconds <= 0)
             {
-                return;
+                return Array.Empty<string>();
             }
             durationSeconds = (int)probe.Duration.Value.TotalSeconds;
         }
@@ -78,9 +53,9 @@ public class ExtractPreviewsTask : IPipelineTask
         var outputPattern = Path.Combine(outputDir, ThumbnailPattern);
         var invocation = FfmpegInvocation.ExtractThumbnails(
             FfmpegExecutable,
-            context.ResolvedPath,
+            inputPath,
             outputPattern,
-            _config.Tasks.Preview.PreviewCount,
+            count,
             TimeSpan.FromSeconds(durationSeconds.Value)
         );
 
@@ -95,15 +70,13 @@ public class ExtractPreviewsTask : IPipelineTask
                 string.Join('\n', snapshot.RecentOutputLines)
             );
         }
-    }
 
-    private static bool HasExistingPreview(string outputDir)
-    {
-        if (!Directory.Exists(outputDir))
-        {
-            return false;
-        }
-
-        return Directory.EnumerateFiles(outputDir, ExistingThumbnailPattern).Any();
+        return Directory
+            .EnumerateFiles(outputDir, ExistingThumbnailPattern)
+            .Select(Path.GetFileName)
+            .Where(name => name is not null)
+            .Select(name => name!)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList();
     }
 }

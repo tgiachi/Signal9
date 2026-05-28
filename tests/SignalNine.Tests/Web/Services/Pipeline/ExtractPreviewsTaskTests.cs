@@ -1,253 +1,150 @@
-using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Ffmpeg;
-using SignalNine.Core.Data.Jobs;
-using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
-using SignalNine.Core.Services;
 using SignalNine.Core.Services.Ffmpeg;
 using SignalNine.Core.Types;
-using SignalNine.Persistence.Entities.Channels;
-using SignalNine.Persistence.Types;
-using SignalNine.Jobs.Data.Pipeline;
 using SignalNine.Jobs.Services.Pipeline;
 
 namespace SignalNine.Tests.Web.Services.Pipeline;
 
 public class ExtractPreviewsTaskTests : IDisposable
 {
-    private const string ResolvedPath = "/path/to/file.mp4";
-
-    private readonly string _rootDir;
+    private readonly string _tempBase;
 
     public ExtractPreviewsTaskTests()
     {
-        _rootDir = Path.Combine(Path.GetTempPath(), $"signal9-preview-tests-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_rootDir);
-        foreach (var name in Enum.GetNames<DirectoryType>())
+        _tempBase = Path.Combine(Path.GetTempPath(), $"signal9-extract-previews-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempBase);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithDurationHint_ReturnsThumbnailFilenames()
+    {
+        var pool = new StubPool(count: 3);
+        var task = new ExtractPreviewsTask(pool);
+        var inputPath = Path.Combine(_tempBase, "input.mp4");
+        File.WriteAllBytes(inputPath, Array.Empty<byte>());
+        var outputDir = Path.Combine(_tempBase, "out-hint");
+
+        var result = await task.RunAsync(inputPath, outputDir, count: 3, durationSecondsHint: 120, CancellationToken.None);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(0, pool.ProbeCallCount);
+        foreach (var name in result)
         {
-            Directory.CreateDirectory(Path.Combine(_rootDir, name));
+            Assert.True(File.Exists(Path.Combine(outputDir, name)), $"Expected file {name} to exist in outputDir.");
         }
     }
 
     [Fact]
-    public void Order_Is200()
+    public async Task RunAsync_WithoutDurationHint_CallsProbeFirst()
     {
-        var (task, _, _, _) = Build();
-        Assert.Equal(200, task.Order);
+        var pool = new StubPool(count: 2);
+        pool.NextProbeDuration = TimeSpan.FromSeconds(90);
+        var task = new ExtractPreviewsTask(pool);
+        var inputPath = Path.Combine(_tempBase, "input.mp4");
+        File.WriteAllBytes(inputPath, Array.Empty<byte>());
+        var outputDir = Path.Combine(_tempBase, "out-probe");
+
+        var result = await task.RunAsync(inputPath, outputDir, count: 2, durationSecondsHint: null, CancellationToken.None);
+
+        Assert.Equal(1, pool.ProbeCallCount);
+        Assert.Equal(2, result.Count);
     }
 
     [Fact]
-    public async Task Execute_BuildsExtractThumbnailsInvocation()
+    public async Task RunAsync_WithoutHintAndProbeReturnsNullDuration_ReturnsEmpty()
     {
-        var (task, pool, _, _) = Build();
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = 120,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
+        var pool = new StubPool(count: 0);
+        pool.NextProbeDuration = null;
+        var task = new ExtractPreviewsTask(pool);
+        var inputPath = Path.Combine(_tempBase, "input.mp4");
+        File.WriteAllBytes(inputPath, Array.Empty<byte>());
+        var outputDir = Path.Combine(_tempBase, "out-probe-fail");
 
-        await task.ExecuteAsync(ctx, CancellationToken.None);
+        var result = await task.RunAsync(inputPath, outputDir, count: 3, durationSecondsHint: null, CancellationToken.None);
 
-        Assert.NotNull(pool.LastInvocation);
-        Assert.Contains(ResolvedPath, pool.LastInvocation!.Arguments);
-        Assert.Contains("-frames:v", pool.LastInvocation.Arguments);
+        Assert.Equal(1, pool.ProbeCallCount);
+        Assert.Empty(result);
+        Assert.Null(pool.LastInvocation);
     }
 
     [Fact]
-    public async Task Execute_OutputDirContainsChannelMediaId()
+    public async Task RunAsync_ExistingOutputDir_IsWipedBeforeRun()
     {
-        var (task, pool, _, _) = Build();
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = 60,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
-
-        await task.ExecuteAsync(ctx, CancellationToken.None);
-
-        Assert.NotNull(pool.LastInvocation);
-        var lastArg = pool.LastInvocation!.Arguments[^1];
-        Assert.Contains(media.Id.ToString(), lastArg);
-        Assert.Contains("thumb-%03d.jpg", lastArg);
-    }
-
-    [Fact]
-    public async Task Execute_UsesConfiguredPreviewCount()
-    {
-        var (task, pool, _, config) = Build();
-        config.Tasks.Preview.PreviewCount = 3;
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = 120,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
-
-        await task.ExecuteAsync(ctx, CancellationToken.None);
-
-        Assert.NotNull(pool.LastInvocation);
-        var arguments = pool.LastInvocation!.Arguments.ToList();
-        var framesIndex = arguments.IndexOf("-frames:v");
-        Assert.True(framesIndex >= 0);
-        Assert.Equal("3", arguments[framesIndex + 1]);
-    }
-
-    [Fact]
-    public async Task Execute_CleansExistingDirBeforeRun()
-    {
-        var (task, _, directories, config) = Build();
-        config.Tasks.Preview.OverwriteExisting = true;
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = 60,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
-
-        var outputDir = Path.Combine(
-            directories[DirectoryType.Assets],
-            "previews",
-            media.Id.ToString()
-        );
+        var pool = new StubPool(count: 1);
+        var task = new ExtractPreviewsTask(pool);
+        var inputPath = Path.Combine(_tempBase, "input.mp4");
+        File.WriteAllBytes(inputPath, Array.Empty<byte>());
+        var outputDir = Path.Combine(_tempBase, "out-wipe");
         Directory.CreateDirectory(outputDir);
         var staleFile = Path.Combine(outputDir, "stale.jpg");
-        File.WriteAllText(staleFile, "old");
+        File.WriteAllText(staleFile, "old content");
 
-        await task.ExecuteAsync(ctx, CancellationToken.None);
+        await task.RunAsync(inputPath, outputDir, count: 1, durationSecondsHint: 60, CancellationToken.None);
 
-        Assert.True(Directory.Exists(outputDir));
         Assert.False(File.Exists(staleFile));
+        Assert.True(Directory.Exists(outputDir));
     }
 
     [Fact]
-    public async Task Execute_ExistingPreview_AndOverwriteFalse_SkipsRun()
+    public async Task RunAsync_CountZero_ReturnsEmptyWithoutInvokingFfmpeg()
     {
-        var (task, pool, directories, _) = Build();
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = null,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
+        var pool = new StubPool(count: 0);
+        var task = new ExtractPreviewsTask(pool);
+        var inputPath = Path.Combine(_tempBase, "input.mp4");
+        File.WriteAllBytes(inputPath, Array.Empty<byte>());
+        var outputDir = Path.Combine(_tempBase, "out-zero");
 
-        var outputDir = Path.Combine(
-            directories[DirectoryType.Assets],
-            "previews",
-            media.Id.ToString()
-        );
-        Directory.CreateDirectory(outputDir);
-        var existingFile = Path.Combine(outputDir, "thumb-001.jpg");
-        File.WriteAllText(existingFile, "existing");
+        var result = await task.RunAsync(inputPath, outputDir, count: 0, durationSecondsHint: 60, CancellationToken.None);
 
-        await task.ExecuteAsync(ctx, CancellationToken.None);
-
-        Assert.True(File.Exists(existingFile));
+        Assert.Empty(result);
+        Assert.Null(pool.LastInvocation);
         Assert.Equal(0, pool.ProbeCallCount);
-        Assert.Null(pool.LastInvocation);
     }
 
     [Fact]
-    public async Task Execute_NoDuration_AndProbeFallbackReturnsNull_SkipsRun()
+    public async Task RunAsync_FfmpegFails_ThrowsFfmpegExecutionException()
     {
-        var (task, pool, _, _) = Build();
-        pool.NextProbeDuration = null;
-
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = null,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
-
-        await task.ExecuteAsync(ctx, CancellationToken.None);
-
-        Assert.Equal(1, pool.ProbeCallCount);
-        Assert.Null(pool.LastInvocation);
-    }
-
-    [Fact]
-    public async Task Execute_NoDuration_FallsBackToProbe()
-    {
-        var (task, pool, _, _) = Build();
-        pool.NextProbeDuration = TimeSpan.FromSeconds(120);
-
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = null,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
-
-        await task.ExecuteAsync(ctx, CancellationToken.None);
-
-        Assert.Equal(1, pool.ProbeCallCount);
-        Assert.NotNull(pool.LastInvocation);
-    }
-
-    [Fact]
-    public async Task Execute_RunReturnsFailedSnapshot_Throws()
-    {
-        var (task, pool, _, _) = Build();
+        var pool = new StubPool(count: 0);
         pool.NextRunStatus = FfmpegProcessStatusType.Failed;
         pool.NextExitCode = 1;
-
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = 60,
-            SourceType = MediaSourceType.LocalFile
-        };
-        var ctx = NewContext(media);
+        var task = new ExtractPreviewsTask(pool);
+        var inputPath = Path.Combine(_tempBase, "input.mp4");
+        File.WriteAllBytes(inputPath, Array.Empty<byte>());
+        var outputDir = Path.Combine(_tempBase, "out-fail");
 
         await Assert.ThrowsAsync<FfmpegExecutionException>(
-            () => task.ExecuteAsync(ctx, CancellationToken.None)
+            () => task.RunAsync(inputPath, outputDir, count: 2, durationSecondsHint: 60, CancellationToken.None)
         );
     }
 
     [Fact]
-    public async Task Execute_JellyfinMedia_AndStreamFallbackDisabled_SkipsRun()
+    public async Task RunAsync_ResultFilesAreReturnedAsSortedBasenames()
     {
-        var (task, pool, _, _) = Build();
-        var media = new ChannelMediaEntity
+        var pool = new StubPool(count: 5);
+        var task = new ExtractPreviewsTask(pool);
+        var inputPath = Path.Combine(_tempBase, "input.mp4");
+        File.WriteAllBytes(inputPath, Array.Empty<byte>());
+        var outputDir = Path.Combine(_tempBase, "out-sorted");
+
+        var result = await task.RunAsync(inputPath, outputDir, count: 5, durationSecondsHint: 300, CancellationToken.None);
+
+        Assert.Equal(5, result.Count);
+        var sorted = result.OrderBy(n => n, StringComparer.Ordinal).ToList();
+        Assert.Equal(sorted, result);
+        foreach (var name in result)
         {
-            DurationSeconds = 60,
-            SourceType = MediaSourceType.Jellyfin,
-            SourceRef = "jf-item-1"
-        };
-        var ctx = NewContext(media);
-
-        await task.ExecuteAsync(ctx, CancellationToken.None);
-
-        Assert.Equal(0, pool.ProbeCallCount);
-        Assert.Null(pool.LastInvocation);
-    }
-
-    [Fact]
-    public async Task Execute_JellyfinMedia_AndStreamFallbackEnabled_RunsExtraction()
-    {
-        var (task, pool, _, config) = Build();
-        config.Tasks.Preview.AllowJellyfinStreamFallback = true;
-        var media = new ChannelMediaEntity
-        {
-            DurationSeconds = 60,
-            SourceType = MediaSourceType.Jellyfin,
-            SourceRef = "jf-item-1"
-        };
-        var ctx = NewContext(media);
-
-        await task.ExecuteAsync(ctx, CancellationToken.None);
-
-        Assert.NotNull(pool.LastInvocation);
+            Assert.DoesNotContain(Path.DirectorySeparatorChar, name);
+        }
     }
 
     public void Dispose()
     {
-        if (Directory.Exists(_rootDir))
+        if (Directory.Exists(_tempBase))
         {
             try
             {
-                Directory.Delete(_rootDir, recursive: true);
+                Directory.Delete(_tempBase, recursive: true);
             }
             catch
             {
@@ -257,27 +154,10 @@ public class ExtractPreviewsTaskTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private (ExtractPreviewsTask Task, StubPool Pool, DirectoriesConfig Directories, PipelineConfig Config) Build()
-    {
-        var pool = new StubPool();
-        var directories = new DirectoriesConfig(_rootDir, Enum.GetNames<DirectoryType>());
-        var config = new PipelineConfig();
-        var task = new ExtractPreviewsTask(pool, directories, config);
-        return (task, pool, directories, config);
-    }
-
-    private static PipelineContext NewContext(ChannelMediaEntity media)
-    {
-        return new PipelineContext(
-            media,
-            new MediaLibraryEntity { Id = Guid.NewGuid(), Name = "L", IsActive = true, SourceRef = "/x" },
-            ResolvedPath,
-            new JobExecutionContext(Guid.NewGuid(), "{}", Path.Combine(Path.GetTempPath(), $"signalnine-tests-{Guid.NewGuid():N}"), new InMemoryJobBus())
-        );
-    }
-
     private sealed class StubPool : IFfmpegPool
     {
+        private readonly int _thumbCount;
+
         public TimeSpan? NextProbeDuration { get; set; } = TimeSpan.FromSeconds(60);
         public int ProbeCallCount { get; private set; }
         public FfmpegInvocation? LastInvocation { get; private set; }
@@ -285,6 +165,11 @@ public class ExtractPreviewsTaskTests : IDisposable
         public int? NextExitCode { get; set; } = 0;
 
         public event EventHandler<FfmpegProcessSnapshot>? ProcessChanged;
+
+        public StubPool(int count)
+        {
+            _thumbCount = count;
+        }
 
         public Task<FfprobeResult> ProbeAsync(string inputPath, CancellationToken ct = default)
         {
@@ -298,6 +183,22 @@ public class ExtractPreviewsTaskTests : IDisposable
             CancellationToken ct = default)
         {
             LastInvocation = invocation;
+
+            if (NextRunStatus == FfmpegProcessStatusType.Completed && _thumbCount > 0)
+            {
+                // Determine outputDir from the pattern argument (last arg contains thumb-%03d.jpg)
+                var patternArg = invocation.Arguments[^1];
+                var dir = Path.GetDirectoryName(patternArg);
+                if (dir is not null && Directory.Exists(dir))
+                {
+                    for (var i = 1; i <= _thumbCount; i++)
+                    {
+                        var fileName = $"thumb-{i:D3}.jpg";
+                        File.WriteAllBytes(Path.Combine(dir, fileName), Array.Empty<byte>());
+                    }
+                }
+            }
+
             var snapshot = new FfmpegProcessSnapshot(
                 Guid.NewGuid(),
                 1,
@@ -329,77 +230,6 @@ public class ExtractPreviewsTaskTests : IDisposable
         public Task<bool> CancelAsync(Guid processId, CancellationToken ct = default)
         {
             return Task.FromResult(false);
-        }
-    }
-
-    private sealed class NoopJobManager : IJobManager
-    {
-        public Task<JobSnapshot> EnqueueAsync(EnqueueJobCommand command, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public IReadOnlyList<JobSnapshot> List()
-        {
-            return Array.Empty<JobSnapshot>();
-        }
-
-        public JobSnapshot? GetById(Guid jobId)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<JobLogEntry> GetLogs(Guid jobId)
-        {
-            return Array.Empty<JobLogEntry>();
-        }
-
-        public Task<bool> CancelAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(false);
-        }
-
-        public ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
-            => DequeueAsync(cancellationToken);
-
-        public Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task CompleteAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task FailAsync(Guid jobId, Exception exception, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task MarkCanceledAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task ReportProgressAsync(Guid jobId, int percent, string message, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task WriteLogAsync(Guid jobId, JobLogLevelType level, string message, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public CancellationToken GetCancellationToken(Guid jobId)
-        {
-            return CancellationToken.None;
         }
     }
 }
