@@ -15,5 +15,31 @@ services:
       timeout: 3s
       retries: 5
 
+  worker1:
+    build:
+      context: .
+      dockerfile: src/SignalNine.Worker/Dockerfile
+    environment:
+      SIGNAL9_REDIS_URL: redis://redis:6379
+      SIGNAL9_WORKER_NAME: worker1
+      SIGNAL9_MAX_CONCURRENT_JOBS: 2
+    volumes:
+      - /signal9_work:/signal9_work
+    depends_on: [redis]
+    restart: unless-stopped
+
+  worker2:
+    build:
+      context: .
+      dockerfile: src/SignalNine.Worker/Dockerfile
+    environment:
+      SIGNAL9_REDIS_URL: redis://redis:6379
+      SIGNAL9_WORKER_NAME: worker2
+      SIGNAL9_MAX_CONCURRENT_JOBS: 2
+    volumes:
+      - /signal9_work:/signal9_work
+    depends_on: [redis]
+    restart: unless-stopped
+
 volumes:
   redis_data:
