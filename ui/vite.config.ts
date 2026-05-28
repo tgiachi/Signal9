@@ -15,6 +15,11 @@ export default defineConfig({
       '/health': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
       '/live': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
       '/swagger': { target: 'http://localhost:5017', changeOrigin: true, secure: false },
+      '/assets/previews': {
+        target: 'http://localhost:5017',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   build: {
