@@ -17,6 +17,7 @@ using SignalNine.Web.Endpoints;
 using SignalNine.Web.Hubs;
 using SignalNine.Web.Interfaces;
 using SignalNine.Web.Services;
+using SignalNine.Web.Services.Config;
 using SignalNine.Web.Services.Pipeline;
 using SignalNine.Core.Services.Ffmpeg;
 
@@ -71,6 +72,9 @@ builder.Services.AddSingleton<IJobHandler, LibraryScanJobHandler>();
 builder.Services.AddScoped<IMediaPathResolver, DefaultMediaPathResolver>();
 builder.Services.AddScoped<IPipelineTask, ProbeMediaTask>();
 builder.Services.AddScoped<IPipelineTask, ExtractPreviewsTask>();
+builder.Services.AddSingleton<IPipelineTaskConfigSchemaProvider, ProbeMediaTaskConfigSchemaProvider>();
+builder.Services.AddSingleton<IPipelineTaskConfigSchemaProvider, ExtractPreviewsTaskConfigSchemaProvider>();
+builder.Services.AddSingleton<ConfigSchemaService>();
 builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
@@ -93,7 +97,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                        var accessToken = context.Request.Query["access_token"].ToString();
                        var path = context.HttpContext.Request.Path;
 
-                       if (!string.IsNullOrWhiteSpace(accessToken) && path.StartsWithSegments(JobsHubPathPrefix))
+                       if (
+                           !string.IsNullOrWhiteSpace(accessToken) &&
+                           (path.StartsWithSegments(JobsHubPathPrefix) ||
+                               (path.StartsWithSegments("/api/media") && path.Value!.EndsWith("/stream")))
+                       )
                        {
                            context.Token = accessToken;
                        }

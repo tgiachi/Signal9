@@ -30,8 +30,49 @@ public static class ChannelMediaEndpoints
         group.MapDelete("/{id:guid}/tags/{tagId:guid}", DetachTag);
 
         group.MapPost("/{id:guid}/pipeline", Pipeline);
+        group.MapGet("/{id:guid}/stream", Stream);
 
         return app;
+    }
+
+    private static IResult Stream(
+        Guid id,
+        IDataAccess<ChannelMediaEntity> media,
+        IDataAccess<MediaLibraryEntity> libraries
+    )
+    {
+        var entity = media.GetByKey(id);
+        if (entity is null) return TypedResults.NotFound();
+        if (entity.SourceType != MediaSourceType.LocalFile)
+        {
+            return TypedResults.Problem(
+                detail: $"Streaming not supported for source type {entity.SourceType}.",
+                statusCode: 501
+            );
+        }
+
+        var library = libraries.GetByKey(entity.MediaLibraryId);
+        if (library is null) return TypedResults.NotFound();
+        if (string.IsNullOrWhiteSpace(library.SourceRef) || string.IsNullOrWhiteSpace(entity.SourceRef))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var root = Path.GetFullPath(library.SourceRef);
+        var fullPath = Path.GetFullPath(Path.Combine(root, entity.SourceRef));
+        if (!fullPath.StartsWith(root, StringComparison.Ordinal))
+        {
+            return TypedResults.BadRequest("invalid path");
+        }
+        if (!File.Exists(fullPath)) return TypedResults.NotFound();
+
+        var provider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+        if (!provider.TryGetContentType(fullPath, out var contentType))
+        {
+            contentType = "application/octet-stream";
+        }
+
+        return Results.File(fullPath, contentType, enableRangeProcessing: true);
     }
 
     private static Ok<IReadOnlyList<ChannelMediaResponse>> List(
