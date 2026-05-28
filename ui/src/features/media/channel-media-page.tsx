@@ -93,13 +93,13 @@ export function ChannelMediaPage() {
         />
 
         <div className="min-h-0 flex-1 overflow-auto bg-bg-0">
-          <div className="grid min-w-[74rem] grid-cols-[minmax(18rem,1.4fr)_10rem_7rem_minmax(16rem,1.1fr)_8rem_16rem_10rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
+          <div className="grid min-w-[74rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(16rem,1.1fr)_8rem_10rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
+            <span>Preview</span>
             <span>Title</span>
             <span>Media type</span>
             <span>Duration</span>
             <span>Source</span>
             <span>Status</span>
-            <span>Previews</span>
             <span>Actions</span>
           </div>
           {channelMedia.isLoading ? (
@@ -139,10 +139,11 @@ function MediaRow({
   return (
     <div
       className={
-        'grid min-w-[74rem] grid-cols-[minmax(18rem,1.4fr)_10rem_7rem_minmax(16rem,1.1fr)_8rem_16rem_10rem] items-center gap-3 px-3 py-3 ' +
+        'grid min-w-[74rem] grid-cols-[6rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(16rem,1.1fr)_8rem_10rem] items-center gap-3 px-3 py-3 ' +
         (index % 2 ? 'bg-bg-3' : 'bg-bg-2')
       }
     >
+      <PreviewCarousel mediaId={media.id} title={media.title} />
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-fg-0">{media.title}</div>
         <div className="truncate text-[12px] text-fg-3">{typeMetadata(media)}</div>
@@ -162,7 +163,6 @@ function MediaRow({
       >
         {media.isActive ? 'active' : 'paused'}
       </span>
-      <PreviewCarousel mediaId={media.id} title={media.title} />
       <button
         type="button"
         aria-label={`Run pipeline for ${media.title}`}
