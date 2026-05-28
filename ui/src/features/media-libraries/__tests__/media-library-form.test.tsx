@@ -40,10 +40,7 @@ describe('MediaLibraryForm', () => {
     await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Source reference is required');
 
-    // Find the Source reference input (the second text input after Name)
-    const inputs = screen.getAllByRole('textbox').filter(el => el.tagName === 'INPUT');
-    const sourceRefInput = inputs[1];
-    await userEvent.type(sourceRefInput, 'jellyfin-movies');
+    await userEvent.type(screen.getByLabelText('Source reference'), 'jellyfin-movies');
     await userEvent.selectOptions(screen.getByLabelText('Default media type'), '3');
     await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 

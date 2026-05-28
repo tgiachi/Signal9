@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiEmpty, apiJson } from '@/lib/api';
+import { normalizeJob, type JobResponse, type RawJobResponse } from '@/features/jobs/job-types';
+import { JOBS_QUERY_KEY } from '@/features/jobs/use-jobs';
 import { useAuth } from '@/providers/auth-context';
 import type {
   CreateMediaLibraryRequest,
@@ -15,6 +17,15 @@ type UpdateMediaLibraryCommand = {
   id: string;
   input: UpdateMediaLibraryRequest;
 };
+
+function upsertJob(jobs: JobResponse[], job: JobResponse): JobResponse[] {
+  const existing = jobs.findIndex((item) => item.id === job.id);
+  if (existing < 0) return [job, ...jobs];
+
+  const next = jobs.slice();
+  next[existing] = job;
+  return next;
+}
 
 export function useMediaLibrary(id: string | null) {
   const auth = useAuth();
@@ -71,6 +82,19 @@ export function useMediaLibraries() {
     },
   });
 
+  const scan = useMutation({
+    mutationFn: async (id: string) => {
+      const data = await apiJson<RawJobResponse>(`/api/media-libraries/${id}/scan`, {
+        method: 'POST',
+      });
+      return normalizeJob(data);
+    },
+    onSuccess: (job) => {
+      qc.setQueryData<JobResponse[]>(JOBS_QUERY_KEY, (current) => upsertJob(current ?? [], job));
+      void qc.invalidateQueries({ queryKey: MEDIA_LIBRARIES_QUERY_KEY });
+    },
+  });
+
   const libraries = useMemo(
     () => (query.data ?? []).slice().sort((left, right) => left.name.localeCompare(right.name)),
     [query.data],
@@ -86,7 +110,9 @@ export function useMediaLibraries() {
     createMediaLibrary: create.mutateAsync,
     updateMediaLibrary: update.mutateAsync,
     deleteMediaLibrary: remove.mutateAsync,
+    scanMediaLibrary: scan.mutateAsync,
     isSaving: create.isPending || update.isPending,
     isDeleting: remove.isPending,
+    isScanning: scan.isPending,
   };
 }

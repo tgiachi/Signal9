@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Database, Filter, Plus, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Database, Filter, Play, Plus, RefreshCw, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -89,6 +89,15 @@ export function MediaLibrariesPage() {
     try {
       await mediaLibraries.deleteMediaLibrary(library.id);
       toast.success('Media library deleted');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  };
+
+  const scanLibrary = async (library: MediaLibraryResponse) => {
+    try {
+      const job = await mediaLibraries.scanMediaLibrary(library.id);
+      toast.success(`Library scan enqueued: ${job.id.slice(0, 8)}`);
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -221,6 +230,18 @@ export function MediaLibrariesPage() {
                   {formatDate(library.lastScannedAt)}
                 </span>
                 <span className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    aria-label={`Scan ${library.name}`}
+                    disabled={!library.isActive || mediaLibraries.isScanning}
+                    onClick={() => {
+                      void scanLibrary(library);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-[6px] bg-accent-jobs px-2.5 py-1.5 text-[12px] font-semibold text-fg-0 transition hover:opacity-90 disabled:bg-bg-2 disabled:text-fg-3 disabled:opacity-40"
+                  >
+                    <Play className="size-3" />
+                    Scan
+                  </button>
                   <button
                     type="button"
                     aria-label={`Edit ${library.name}`}

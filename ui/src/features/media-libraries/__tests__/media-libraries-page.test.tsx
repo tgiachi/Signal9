@@ -108,6 +108,45 @@ describe('MediaLibrariesPage', () => {
       ).toBe(true),
     );
   });
+
+  it('enqueues a scan job for an active library', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/media-libraries/library-1/scan' && init?.method === 'POST') {
+        return Response.json(
+          {
+            id: 'job-1',
+            type: 'library.scan',
+            state: 'queued',
+            progressPercent: 0,
+            progressMessage: '',
+            error: '',
+            createdAt: '2026-05-28T07:00:00Z',
+            startedAt: null,
+            finishedAt: null,
+          },
+          { status: 202 },
+        );
+      }
+
+      return Response.json([LIBRARY]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+
+    await screen.findByText('Feature films');
+    await userEvent.click(screen.getByRole('button', { name: /scan Movies/i }));
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            String(input) === '/api/media-libraries/library-1/scan' &&
+            init?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+  });
 });
 
 function renderPage() {

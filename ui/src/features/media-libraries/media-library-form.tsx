@@ -112,11 +112,15 @@ export function MediaLibraryForm(props: Props) {
             }
           />
           <div className="block">
-            <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
+            <label
+              htmlFor="media-library-source-ref"
+              className="font-mono text-[10px] uppercase tracking-label text-fg-3"
+            >
               Source reference
-            </span>
+            </label>
             <div className="mt-1 flex gap-2">
               <input
+                id="media-library-source-ref"
                 value={form.sourceRef}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, sourceRef: event.target.value }))
