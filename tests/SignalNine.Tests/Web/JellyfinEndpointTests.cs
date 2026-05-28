@@ -204,5 +204,15 @@ public class JellyfinEndpointTests : IDisposable
         {
             return Task.FromResult<IReadOnlyList<JellyfinItem>>(Array.Empty<JellyfinItem>());
         }
+
+        public Task<IReadOnlyList<JellyfinPreviewImage>> GetPreviewImagesAsync(string itemId, int maxImages, CancellationToken ct = default)
+        {
+            return Task.FromResult<IReadOnlyList<JellyfinPreviewImage>>(Array.Empty<JellyfinPreviewImage>());
+        }
+
+        public Task<JellyfinItemTags> GetItemTagsAsync(string itemId, CancellationToken ct = default)
+        {
+            return Task.FromResult(new JellyfinItemTags(Array.Empty<string>(), Array.Empty<string>()));
+        }
     }
 }
