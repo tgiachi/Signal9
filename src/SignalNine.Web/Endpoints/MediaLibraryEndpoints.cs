@@ -2,12 +2,14 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Pipeline;
 using SignalNine.Core.Interfaces;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Web.Data.Channels;
 using SignalNine.Web.Data.Jobs;
 using SignalNine.Jobs.Services;
+using SignalNine.Web.Services;
 
 namespace SignalNine.Web.Endpoints;
 
@@ -154,6 +156,7 @@ public static class MediaLibraryEndpoints
         Guid id,
         IDataAccess<MediaLibraryEntity> libraries,
         IDataAccess<ChannelMediaEntity> media,
+        WorkSpaceStager stager,
         IJobManager jobs,
         CancellationToken ct
     )
@@ -167,7 +170,13 @@ public static class MediaLibraryEndpoints
         foreach (var item in items)
         {
             ct.ThrowIfCancellationRequested();
-            var payload = JsonSerializer.Serialize(new SignalNine.Core.Data.Pipeline.MediaPipelinePayload(item.Id));
+            var (_, inputRel) = await stager.StageAsync(item, library, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(inputRel))
+            {
+                // Jellyfin/Url sources have nothing to pre-stage in Phase 4 — skip this row.
+                continue;
+            }
+            var payload = JsonSerializer.Serialize(new MediaPipelinePayloadV2(item.Id, inputRel));
             await jobs.EnqueueAsync(
                 new EnqueueJobCommand { Type = MediaPipelineJobType, PayloadJson = payload },
                 ct

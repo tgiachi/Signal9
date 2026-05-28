@@ -2,13 +2,17 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
+using SignalNine.Persistence.Entities.Channels;
+using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
 using SignalNine.Tests.Support.Web;
 using SignalNine.Web.Data.Channels;
 using SignalNine.Web.Data.Jobs;
+using SignalNine.Web.Services;
 
 namespace SignalNine.Tests.Web;
 
@@ -35,6 +39,12 @@ public class ChannelMediaPipelineEndpointTests : IDisposable
                        builder.ConfigureServices(services =>
                        {
                            services.AddSingleton<IJobManager>(_stubJobs);
+                           // Override WorkSpaceStager so staging uses the temp root directory.
+                           var workspaceConfig = new SignalNineConfig
+                           {
+                               WorkSpace = new WorkSpaceConfig { Path = _rootDirectory }
+                           };
+                           services.AddSingleton(new WorkSpaceStager(workspaceConfig));
                        });
                    });
     }
@@ -88,23 +98,64 @@ public class ChannelMediaPipelineEndpointTests : IDisposable
     {
         using var client = JwtClientFactory.CreateAuthorizedClient(_factory.CreateClient());
 
-        var createResp = await client.PostAsJsonAsync("/api/media", NewMovieRequest("Pipeline Movie"));
-        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
-        var created = await createResp.Content.ReadFromJsonAsync<ChannelMediaResponse>();
-        Assert.NotNull(created);
+        // Create a LocalFile library with a real source directory and a real input file.
+        var libSourceDir = Path.Combine(Path.GetTempPath(), $"signalnine-pipe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(libSourceDir);
+        try
+        {
+            var sourceFilename = "pipeline-movie.mp4";
+            File.WriteAllText(Path.Combine(libSourceDir, sourceFilename), "dummy");
 
-        var expectedJobId = Guid.NewGuid();
-        _stubJobs.SetNext(expectedJobId, MediaPipelineJobType);
+            var libResp = await client.PostAsJsonAsync("/api/media-libraries", new CreateMediaLibraryRequest(
+                Name: "Pipeline Library",
+                Description: null,
+                DefaultMediaType: ChannelMediaType.Movies,
+                SourceType: MediaSourceType.LocalFile,
+                SourceRef: libSourceDir
+            ));
+            Assert.Equal(HttpStatusCode.Created, libResp.StatusCode);
+            var lib = await libResp.Content.ReadFromJsonAsync<MediaLibraryResponse>();
+            Assert.NotNull(lib);
 
-        var response = await client.PostAsync($"/api/media/{created!.Id}/pipeline", content: null);
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+            // Insert media directly so we can set MediaLibraryId.
+            var mediaId = Guid.NewGuid();
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var mediaAccess = scope.ServiceProvider.GetRequiredService<IDataAccess<ChannelMediaEntity>>();
+                mediaAccess.Insert(new ChannelMediaEntity
+                {
+                    Id = mediaId,
+                    Type = ChannelMediaType.Movies,
+                    Title = "Pipeline Movie",
+                    IsActive = true,
+                    SourceType = MediaSourceType.LocalFile,
+                    SourceRef = sourceFilename,
+                    MediaLibraryId = lib!.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
 
-        var body = await response.Content.ReadFromJsonAsync<JobResponse>();
-        Assert.NotNull(body);
-        Assert.Equal(expectedJobId, body!.Id);
-        Assert.NotNull(_stubJobs.LastEnqueued);
-        Assert.Equal(MediaPipelineJobType, _stubJobs.LastEnqueued!.Type);
-        Assert.Contains(created.Id.ToString(), _stubJobs.LastEnqueued.PayloadJson);
+            var expectedJobId = Guid.NewGuid();
+            _stubJobs.SetNext(expectedJobId, MediaPipelineJobType);
+
+            var response = await client.PostAsync($"/api/media/{mediaId}/pipeline", content: null);
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+            var body = await response.Content.ReadFromJsonAsync<JobResponse>();
+            Assert.NotNull(body);
+            Assert.Equal(expectedJobId, body!.Id);
+            Assert.NotNull(_stubJobs.LastEnqueued);
+            Assert.Equal(MediaPipelineJobType, _stubJobs.LastEnqueued!.Type);
+            Assert.Contains(mediaId.ToString(), _stubJobs.LastEnqueued.PayloadJson);
+        }
+        finally
+        {
+            if (Directory.Exists(libSourceDir))
+            {
+                try { Directory.Delete(libSourceDir, recursive: true); } catch { /* best effort */ }
+            }
+        }
     }
 
     [Fact]

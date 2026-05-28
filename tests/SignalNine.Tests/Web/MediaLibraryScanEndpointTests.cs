@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
@@ -10,6 +11,7 @@ using SignalNine.Persistence.Types;
 using SignalNine.Tests.Support.Web;
 using SignalNine.Web.Data.Channels;
 using SignalNine.Web.Data.Jobs;
+using SignalNine.Web.Services;
 
 namespace SignalNine.Tests.Web;
 
@@ -36,6 +38,12 @@ public class MediaLibraryScanEndpointTests : IDisposable
                        builder.ConfigureServices(services =>
                        {
                            services.AddSingleton<IJobManager>(_stubJobs);
+                           // Override WorkSpaceStager so staging uses the temp root directory.
+                           var workspaceConfig = new SignalNineConfig
+                           {
+                               WorkSpace = new WorkSpaceConfig { Path = _rootDirectory }
+                           };
+                           services.AddSingleton(new WorkSpaceStager(workspaceConfig));
                        });
                    });
     }
@@ -114,41 +122,70 @@ public class MediaLibraryScanEndpointTests : IDisposable
     {
         using var client = JwtClientFactory.CreateAuthorizedClient(_factory.CreateClient());
 
-        var createResp = await client.PostAsJsonAsync("/api/media-libraries", NewLib("pa-1"));
-        var lib = await createResp.Content.ReadFromJsonAsync<MediaLibraryResponse>();
-        Assert.NotNull(lib);
-
-        using (var scope = _factory.Services.CreateScope())
+        // Use a LocalFile library whose SourceRef is a real directory on disk.
+        var libSourceDir = Path.Combine(Path.GetTempPath(), $"signalnine-lib-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(libSourceDir);
+        try
         {
-            var media = scope.ServiceProvider
-                .GetRequiredService<SignalNine.Persistence.Interfaces.IDataAccess<SignalNine.Persistence.Entities.Channels.ChannelMediaEntity>>();
+            var createResp = await client.PostAsJsonAsync("/api/media-libraries", new CreateMediaLibraryRequest(
+                Name: "LocalFile library",
+                Description: null,
+                DefaultMediaType: ChannelMediaType.Movies,
+                SourceType: MediaSourceType.LocalFile,
+                SourceRef: libSourceDir
+            ));
+            Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+            var lib = await createResp.Content.ReadFromJsonAsync<MediaLibraryResponse>();
+            Assert.NotNull(lib);
+
+            // Pre-create dummy source files for staging.
+            var fileRefs = new string[3];
             for (var i = 0; i < 3; i++)
             {
-                media.Insert(new SignalNine.Persistence.Entities.Channels.ChannelMediaEntity
+                var filename = $"movie-{i}.mp4";
+                fileRefs[i] = filename;
+                File.WriteAllText(Path.Combine(libSourceDir, filename), "dummy");
+            }
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var media = scope.ServiceProvider
+                    .GetRequiredService<SignalNine.Persistence.Interfaces.IDataAccess<SignalNine.Persistence.Entities.Channels.ChannelMediaEntity>>();
+                for (var i = 0; i < 3; i++)
                 {
-                    Id = Guid.NewGuid(),
-                    Type = ChannelMediaType.Movies,
-                    Title = $"Movie {i}",
-                    IsActive = true,
-                    SourceType = MediaSourceType.Jellyfin,
-                    SourceRef = $"jf-pa-{i}",
-                    MediaLibraryId = lib!.Id,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                });
+                    media.Insert(new SignalNine.Persistence.Entities.Channels.ChannelMediaEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        Type = ChannelMediaType.Movies,
+                        Title = $"Movie {i}",
+                        IsActive = true,
+                        SourceType = MediaSourceType.LocalFile,
+                        SourceRef = fileRefs[i],
+                        MediaLibraryId = lib!.Id,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            _stubJobs.ClearAllEnqueued();
+
+            var response = await client.PostAsync($"/api/media-libraries/{lib!.Id}/process-all", content: null);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var body = await response.Content.ReadFromJsonAsync<ProcessAllMediaLibraryResponse>();
+            Assert.NotNull(body);
+            Assert.Equal(3, body!.EnqueuedCount);
+            Assert.Equal(3, _stubJobs.AllEnqueued.Count);
+            Assert.All(_stubJobs.AllEnqueued, c => Assert.Equal("media.pipeline", c.Type));
+        }
+        finally
+        {
+            if (Directory.Exists(libSourceDir))
+            {
+                try { Directory.Delete(libSourceDir, recursive: true); } catch { /* best effort */ }
             }
         }
-
-        _stubJobs.ClearAllEnqueued();
-
-        var response = await client.PostAsync($"/api/media-libraries/{lib!.Id}/process-all", content: null);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<ProcessAllMediaLibraryResponse>();
-        Assert.NotNull(body);
-        Assert.Equal(3, body!.EnqueuedCount);
-        Assert.Equal(3, _stubJobs.AllEnqueued.Count);
-        Assert.All(_stubJobs.AllEnqueued, c => Assert.Equal("media.pipeline", c.Type));
     }
 
     [Fact]

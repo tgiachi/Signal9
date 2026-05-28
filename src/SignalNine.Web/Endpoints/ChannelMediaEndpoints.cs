@@ -8,6 +8,7 @@ using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
 using SignalNine.Web.Data.Channels;
 using SignalNine.Web.Data.Jobs;
+using SignalNine.Web.Services;
 
 namespace SignalNine.Web.Endpoints;
 
@@ -272,6 +273,8 @@ public static class ChannelMediaEndpoints
     private static async Task<Results<Accepted<JobResponse>, NotFound, Conflict<string>>> Pipeline(
         Guid id,
         IDataAccess<ChannelMediaEntity> dataAccess,
+        IDataAccess<MediaLibraryEntity> libraries,
+        WorkSpaceStager stager,
         IJobManager jobs,
         CancellationToken ct
     )
@@ -285,8 +288,24 @@ public static class ChannelMediaEndpoints
         {
             return TypedResults.Conflict("Media is inactive.");
         }
+        if (media.MediaLibraryId is null)
+        {
+            return TypedResults.Conflict("Source cannot be staged for pipeline");
+        }
 
-        var payload = JsonSerializer.Serialize(new MediaPipelinePayload(id));
+        var library = libraries.GetByKey(media.MediaLibraryId.Value);
+        if (library is null)
+        {
+            return TypedResults.Conflict("Source cannot be staged for pipeline");
+        }
+
+        var (_, inputRel) = await stager.StageAsync(media, library, ct).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(inputRel))
+        {
+            return TypedResults.Conflict("Source cannot be staged for pipeline");
+        }
+
+        var payload = JsonSerializer.Serialize(new MediaPipelinePayloadV2(id, inputRel));
         var snapshot = await jobs.EnqueueAsync(new EnqueueJobCommand
         {
             Type = PipelineJobType,
