@@ -60,7 +60,7 @@ public class LibraryScanJobHandler : IJobHandler
                 foreach (var item in items)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    TryUpsertJellyfinItem(media, jobs, library, item, context);
+                    await TryUpsertJellyfinItemAsync(media, jobs, library, item, context).ConfigureAwait(false);
                     processed++;
                     await MaybeReportProgressAsync(jobs, context, processed, total, cancellationToken).ConfigureAwait(false);
                 }
@@ -71,7 +71,7 @@ public class LibraryScanJobHandler : IJobHandler
                 foreach (var item in localItems)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    TryUpsertLocalItem(media, jobs, library, item, context);
+                    await TryUpsertLocalItemAsync(media, jobs, library, item, context).ConfigureAwait(false);
                     processed++;
                     await MaybeReportProgressAsync(jobs, context, processed, localItems.Count, cancellationToken).ConfigureAwait(false);
                 }
@@ -92,7 +92,7 @@ public class LibraryScanJobHandler : IJobHandler
     // Kept as a literal to avoid coupling this handler to MediaPipelineJobHandler.
     private const string PipelineJobType = "media.pipeline";
 
-    private static void TryUpsertJellyfinItem(
+    private static async Task TryUpsertJellyfinItemAsync(
         IDataAccess<ChannelMediaEntity> media,
         IJobManager jobs,
         MediaLibraryEntity library,
@@ -106,7 +106,7 @@ public class LibraryScanJobHandler : IJobHandler
             if (existing is null)
             {
                 var inserted = media.Insert(BuildChannelMediaFromJellyfin(library, item));
-                EnqueuePipelineForNew(jobs, inserted.Id);
+                await EnqueuePipelineForNewAsync(jobs, inserted.Id, context).ConfigureAwait(false);
             }
             else
             {
@@ -116,12 +116,12 @@ public class LibraryScanJobHandler : IJobHandler
         }
         catch (Exception ex)
         {
-            _ = jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
-                $"Failed to upsert Jellyfin item {item.Id}: {ex.Message}", CancellationToken.None);
+            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
+                $"Failed to upsert Jellyfin item {item.Id}: {ex.Message}", CancellationToken.None).ConfigureAwait(false);
         }
     }
 
-    private static void TryUpsertLocalItem(
+    private static async Task TryUpsertLocalItemAsync(
         IDataAccess<ChannelMediaEntity> media,
         IJobManager jobs,
         MediaLibraryEntity library,
@@ -135,7 +135,7 @@ public class LibraryScanJobHandler : IJobHandler
             if (existing is null)
             {
                 var inserted = media.Insert(BuildChannelMediaFromLocal(library, item));
-                EnqueuePipelineForNew(jobs, inserted.Id);
+                await EnqueuePipelineForNewAsync(jobs, inserted.Id, context).ConfigureAwait(false);
             }
             else
             {
@@ -145,17 +145,35 @@ public class LibraryScanJobHandler : IJobHandler
         }
         catch (Exception ex)
         {
-            _ = jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
-                $"Failed to upsert local file {item.RelativePath}: {ex.Message}", CancellationToken.None);
+            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
+                $"Failed to upsert local file {item.RelativePath}: {ex.Message}", CancellationToken.None).ConfigureAwait(false);
         }
     }
 
-    private static void EnqueuePipelineForNew(IJobManager jobs, Guid channelMediaId)
+    private static async Task EnqueuePipelineForNewAsync(
+        IJobManager jobs,
+        Guid channelMediaId,
+        JobExecutionContext context
+    )
     {
-        var payload = JsonSerializer.Serialize(new MediaPipelinePayload(channelMediaId));
-        _ = jobs.EnqueueAsync(
-            new EnqueueJobCommand { Type = PipelineJobType, PayloadJson = payload },
-            CancellationToken.None);
+        try
+        {
+            var payload = JsonSerializer.Serialize(new MediaPipelinePayload(channelMediaId));
+            var snap = await jobs.EnqueueAsync(
+                new EnqueueJobCommand { Type = PipelineJobType, PayloadJson = payload },
+                CancellationToken.None
+            ).ConfigureAwait(false);
+
+            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Information,
+                $"Enqueued media.pipeline job {snap.Id} for ChannelMedia {channelMediaId}",
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
+                $"Failed to enqueue media.pipeline for {channelMediaId}: {ex.Message}",
+                CancellationToken.None).ConfigureAwait(false);
+        }
     }
 
     private static ChannelMediaEntity? FindExisting(

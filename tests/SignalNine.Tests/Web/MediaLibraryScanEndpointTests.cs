@@ -102,6 +102,79 @@ public class MediaLibraryScanEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task Post_ProcessAll_LibraryMissing_Returns404()
+    {
+        using var client = JwtClientFactory.CreateAuthorizedClient(_factory.CreateClient());
+        var response = await client.PostAsync($"/api/media-libraries/{Guid.NewGuid()}/process-all", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_ProcessAll_EnqueuesPipelinePerMedia()
+    {
+        using var client = JwtClientFactory.CreateAuthorizedClient(_factory.CreateClient());
+
+        var createResp = await client.PostAsJsonAsync("/api/media-libraries", NewLib("pa-1"));
+        var lib = await createResp.Content.ReadFromJsonAsync<MediaLibraryResponse>();
+        Assert.NotNull(lib);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var media = scope.ServiceProvider
+                .GetRequiredService<SignalNine.Persistence.Interfaces.IDataAccess<SignalNine.Persistence.Entities.Channels.ChannelMediaEntity>>();
+            for (var i = 0; i < 3; i++)
+            {
+                media.Insert(new SignalNine.Persistence.Entities.Channels.ChannelMediaEntity
+                {
+                    Id = Guid.NewGuid(),
+                    Type = ChannelMediaType.Movies,
+                    Title = $"Movie {i}",
+                    IsActive = true,
+                    SourceType = MediaSourceType.Jellyfin,
+                    SourceRef = $"jf-pa-{i}",
+                    MediaLibraryId = lib!.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
+
+        _stubJobs.ClearAllEnqueued();
+
+        var response = await client.PostAsync($"/api/media-libraries/{lib!.Id}/process-all", content: null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<ProcessAllMediaLibraryResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(3, body!.EnqueuedCount);
+        Assert.Equal(3, _stubJobs.AllEnqueued.Count);
+        Assert.All(_stubJobs.AllEnqueued, c => Assert.Equal("media.pipeline", c.Type));
+    }
+
+    [Fact]
+    public async Task Post_ProcessAll_InactiveLibrary_Returns409()
+    {
+        using var client = JwtClientFactory.CreateAuthorizedClient(_factory.CreateClient());
+
+        var createResp = await client.PostAsJsonAsync("/api/media-libraries", NewLib("pa-inactive"));
+        var lib = await createResp.Content.ReadFromJsonAsync<MediaLibraryResponse>();
+        Assert.NotNull(lib);
+
+        var update = new UpdateMediaLibraryRequest(
+            Name: lib!.Name,
+            Description: lib.Description,
+            DefaultMediaType: lib.DefaultMediaType,
+            IsActive: false,
+            SourceType: lib.SourceType,
+            SourceRef: lib.SourceRef
+        );
+        await client.PutAsJsonAsync($"/api/media-libraries/{lib.Id}", update);
+
+        var response = await client.PostAsync($"/api/media-libraries/{lib.Id}/process-all", content: null);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Post_Scan_InactiveLibrary_Returns409()
     {
         using var client = JwtClientFactory.CreateAuthorizedClient(_factory.CreateClient());
@@ -128,22 +201,32 @@ public class MediaLibraryScanEndpointTests : IDisposable
     private sealed class StubJobManager : IJobManager
     {
         public EnqueueJobCommand? LastEnqueued { get; private set; }
+        public List<EnqueueJobCommand> AllEnqueued { get; } = new();
         public Guid LastReturnedSnapshotId { get; private set; } = Guid.NewGuid();
-        private string _nextType = "library.scan";
+        private bool _nextIdConsumed = true;
 
         public void SetNextSnapshot(Guid id, string type)
         {
             LastReturnedSnapshotId = id;
-            _nextType = type;
+            _nextIdConsumed = false;
+        }
+
+        public void ClearAllEnqueued()
+        {
+            AllEnqueued.Clear();
+            LastEnqueued = null;
         }
 
         public Task<JobSnapshot> EnqueueAsync(EnqueueJobCommand command, CancellationToken cancellationToken = default)
         {
             LastEnqueued = command;
+            AllEnqueued.Add(command);
+            var id = _nextIdConsumed ? Guid.NewGuid() : LastReturnedSnapshotId;
+            _nextIdConsumed = true;
             var snapshot = new JobSnapshot
             {
-                Id = LastReturnedSnapshotId,
-                Type = _nextType,
+                Id = id,
+                Type = command.Type,
                 State = JobStateType.Queued,
                 Progress = new JobProgressSnapshot { Percent = 0, Message = "queued" },
                 CreatedAt = DateTime.UtcNow

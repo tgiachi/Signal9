@@ -26,6 +26,7 @@ public static class MediaLibraryEndpoints
         group.MapPut("/{id:guid}", Update);
         group.MapDelete("/{id:guid}", Delete);
         group.MapPost("/{id:guid}/scan", Scan);
+        group.MapPost("/{id:guid}/process-all", ProcessAll);
 
         return app;
     }
@@ -144,6 +145,37 @@ public static class MediaLibraryEndpoints
         }, ct);
 
         return TypedResults.Accepted($"/api/jobs/{snapshot.Id}", ToJobResponse(snapshot));
+    }
+
+    // Kept as a literal to avoid coupling to MediaPipelineJobHandler.
+    private const string MediaPipelineJobType = "media.pipeline";
+
+    private static async Task<Results<Ok<ProcessAllMediaLibraryResponse>, NotFound, Conflict<string>>> ProcessAll(
+        Guid id,
+        IDataAccess<MediaLibraryEntity> libraries,
+        IDataAccess<ChannelMediaEntity> media,
+        IJobManager jobs,
+        CancellationToken ct
+    )
+    {
+        var library = libraries.GetByKey(id);
+        if (library is null) return TypedResults.NotFound();
+        if (!library.IsActive) return TypedResults.Conflict("Library is inactive.");
+
+        var items = media.List().Where(m => m.MediaLibraryId == id).ToList();
+        var enqueued = 0;
+        foreach (var item in items)
+        {
+            ct.ThrowIfCancellationRequested();
+            var payload = JsonSerializer.Serialize(new SignalNine.Core.Data.Pipeline.MediaPipelinePayload(item.Id));
+            await jobs.EnqueueAsync(
+                new EnqueueJobCommand { Type = MediaPipelineJobType, PayloadJson = payload },
+                ct
+            );
+            enqueued++;
+        }
+
+        return TypedResults.Ok(new ProcessAllMediaLibraryResponse(enqueued));
     }
 
     private static JobResponse ToJobResponse(JobSnapshot job)
