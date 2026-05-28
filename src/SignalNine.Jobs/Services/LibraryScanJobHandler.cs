@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Jobs.Results;
 using SignalNine.Core.Data.Pipeline;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
@@ -27,7 +28,7 @@ public class LibraryScanJobHandler : IJobHandler
 
     public string Type => JobType;
 
-    public async Task ExecuteAsync(JobExecutionContext context, CancellationToken cancellationToken)
+    public async Task<IJobResult> ExecuteAsync(JobExecutionContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -87,6 +88,9 @@ public class LibraryScanJobHandler : IJobHandler
         library.LastScannedAt = DateTime.UtcNow;
         library.UpdatedAt = DateTime.UtcNow;
         libraries.Update(library);
+
+        // Stub result — will be replaced with typed LibraryScanResult in T8-T11
+        return new EmptyJobResult(JobType);
     }
 
     // Kept as a literal to avoid coupling this handler to MediaPipelineJobHandler.

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Jobs.Results;
 using SignalNine.Core.Data.Pipeline;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
@@ -25,7 +26,7 @@ public class MediaPipelineJobHandler : IJobHandler
 
     public string Type => JobType;
 
-    public async Task ExecuteAsync(JobExecutionContext context, CancellationToken cancellationToken)
+    public async Task<IJobResult> ExecuteAsync(JobExecutionContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -86,5 +87,8 @@ public class MediaPipelineJobHandler : IJobHandler
 
         mediaEntity.UpdatedAt = DateTime.UtcNow;
         media.Update(mediaEntity);
+
+        // Stub result — will be replaced with typed MediaPipelineResult in T8-T11
+        return new EmptyJobResult(JobType);
     }
 }
