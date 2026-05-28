@@ -111,7 +111,7 @@ else
     builder.Services.AddSingleton<IJobBus,
         InMemoryJobBus>();
 }
-builder.Services.AddSingleton<IWorkerRegistry, InMemoryWorkerRegistry>();
+builder.Services.AddScoped<IWorkerRegistry, SignalNine.Web.Services.Workers.SqliteWorkerRegistry>();
 var assetsRoot = directoriesConfig[DirectoryType.Assets];
 builder.Services.AddSingleton<IAssetStore>(
     _ =>
@@ -161,6 +161,7 @@ if (signalNineConfig.JobSystem.RunInProcessWorker)
 builder.Services.AddHostedService<JobBusToManagerAdapter>();
 builder.Services.AddHostedService<LogsBroadcastService>();
 builder.Services.AddHostedService<WorkSpaceJanitor>();
+builder.Services.AddHostedService<HeartbeatConsumer>();
 builder.Services
        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
        .AddJwtBearer(
