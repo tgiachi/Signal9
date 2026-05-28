@@ -202,6 +202,7 @@ app.MapHealthChecks(
 app.MapHealthChecks("/health")
    .AllowAnonymous();
 app.MapAuthenticationEndpoints();
+app.MapFilesystemEndpoints();
 app.MapConfigEndpoints();
 app.MapJellyfinEndpoints();
 app.MapMediaLibraryEndpoints();
