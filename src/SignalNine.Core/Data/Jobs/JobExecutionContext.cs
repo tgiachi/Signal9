@@ -5,24 +5,38 @@ namespace SignalNine.Core.Data.Jobs;
 
 public class JobExecutionContext
 {
-    private readonly IJobManager _jobManager;
+    private readonly IJobBus _bus;
 
     public Guid JobId { get; }
 
     public string PayloadJson { get; }
 
-    public JobExecutionContext(Guid jobId, string payloadJson, IJobManager jobManager)
+    public string WorkDir { get; }
+
+    public JobExecutionContext(Guid jobId, string payloadJson, string workDir, IJobBus bus)
     {
-        ArgumentNullException.ThrowIfNull(jobManager);
+        ArgumentNullException.ThrowIfNull(bus);
+        ArgumentException.ThrowIfNullOrEmpty(workDir);
 
         JobId = jobId;
         PayloadJson = payloadJson;
-        _jobManager = jobManager;
+        WorkDir = workDir;
+        _bus = bus;
     }
 
     public Task ReportProgressAsync(int percent, string message, CancellationToken cancellationToken = default)
-        => _jobManager.ReportProgressAsync(JobId, percent, message, cancellationToken);
+    {
+        return _bus.PublishProgressAsync(
+            new JobProgressEvent(JobId, percent, message, DateTimeOffset.UtcNow),
+            cancellationToken
+        );
+    }
 
     public Task WriteLogAsync(JobLogLevelType level, string message, CancellationToken cancellationToken = default)
-        => _jobManager.WriteLogAsync(JobId, level, message, cancellationToken);
+    {
+        return _bus.PublishLogAsync(
+            new JobLogEvent(JobId, level, message, DateTimeOffset.UtcNow),
+            cancellationToken
+        );
+    }
 }
