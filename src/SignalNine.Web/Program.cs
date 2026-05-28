@@ -6,21 +6,25 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi;
 using Serilog;
 using SignalNine.Core.Data.Config;
+using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services;
+using SignalNine.Core.Services.Ffmpeg;
+using SignalNine.Core.Services.Redis;
 using SignalNine.Core.Types;
+using SignalNine.Jobs.Interfaces;
+using SignalNine.Jobs.Services;
+using SignalNine.Jobs.Services.Pipeline;
 using SignalNine.Persistence.Entities.Users;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Services;
 using SignalNine.Web.Endpoints;
 using SignalNine.Web.Hubs;
-using SignalNine.Jobs.Interfaces;
-using SignalNine.Jobs.Services;
 using SignalNine.Web.Services;
 using SignalNine.Web.Services.Config;
-using SignalNine.Jobs.Services.Pipeline;
-using SignalNine.Core.Services.Ffmpeg;
+using SignalNine.Web.Services.Results;
+using StackExchange.Redis;
 
 const string SwaggerBearerSchemeName = "Bearer";
 const string SwaggerDocumentName = "v1";
@@ -88,33 +92,35 @@ builder.Services.AddSingleton<JobTypeRouter>();
 // Job queue + bus: Redis if Redis.Url set, in-memory otherwise.
 if (!string.IsNullOrWhiteSpace(signalNineConfig.Redis.Url))
 {
-    var redisConfig = StackExchange.Redis.ConfigurationOptions.Parse(signalNineConfig.Redis.Url);
+    var redisConfig = ConfigurationOptions.Parse(signalNineConfig.Redis.Url);
     redisConfig.AbortOnConnectFail = false;
     redisConfig.DefaultDatabase = signalNineConfig.Redis.Database;
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(
-        _ => StackExchange.Redis.ConnectionMultiplexer.Connect(redisConfig));
-    builder.Services.AddSingleton<SignalNine.Core.Services.Redis.RedisStreamKeys>(
-        sp => new SignalNine.Core.Services.Redis.RedisStreamKeys(signalNineConfig.Redis));
-    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobQueue,
-        SignalNine.Core.Services.Redis.RedisJobQueue>();
-    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobBus,
-        SignalNine.Core.Services.Redis.RedisJobBus>();
+    builder.Services.AddSingleton<IConnectionMultiplexer>(
+        _ => ConnectionMultiplexer.Connect(redisConfig));
+    builder.Services.AddSingleton<RedisStreamKeys>(
+        sp => new RedisStreamKeys(signalNineConfig.Redis));
+    builder.Services.AddSingleton<IJobQueue,
+        RedisJobQueue>();
+    builder.Services.AddSingleton<IJobBus,
+        RedisJobBus>();
 }
 else
 {
-    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobQueue,
-        SignalNine.Core.Services.InMemoryJobQueue>();
-    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobBus,
-        SignalNine.Core.Services.InMemoryJobBus>();
+    builder.Services.AddSingleton<IJobQueue,
+        InMemoryJobQueue>();
+    builder.Services.AddSingleton<IJobBus,
+        InMemoryJobBus>();
 }
-builder.Services.AddSingleton<SignalNine.Core.Interfaces.IWorkerRegistry, SignalNine.Core.Services.InMemoryWorkerRegistry>();
+builder.Services.AddSingleton<IWorkerRegistry, InMemoryWorkerRegistry>();
 var assetsRoot = directoriesConfig[DirectoryType.Assets];
-builder.Services.AddSingleton<SignalNine.Core.Interfaces.IAssetStore>(_ =>
-    new SignalNine.Core.Services.FileSystemAssetStore(assetsRoot));
-builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobResultProcessor,
-    SignalNine.Core.Services.LegacyShimResultProcessor>();
-builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobResultProcessor,
-    SignalNine.Web.Services.Results.MediaPipelineResultProcessor>();
+builder.Services.AddSingleton<IAssetStore>(_ =>
+                                               new FileSystemAssetStore(assetsRoot));
+builder.Services.AddSingleton<IJobResultProcessor,
+    LegacyShimResultProcessor>();
+builder.Services.AddSingleton<IJobResultProcessor,
+    MediaPipelineResultProcessor>();
+builder.Services.AddSingleton<IJobResultProcessor,
+    LibraryScanResultProcessor>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
 builder.Services.AddSingleton(freeSql);
@@ -129,16 +135,16 @@ builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWo
     sp.GetRequiredService<SignalNineConfig>(),
     sp.GetServices<IJobHandler>(),
     sp.GetRequiredService<IJobManager>(),
-    sp.GetRequiredService<SignalNine.Core.Interfaces.IJobBus>(),
-    SignalNine.Core.Data.Jobs.JobStreamTarget.Internal)));
+    sp.GetRequiredService<IJobBus>(),
+    JobStreamTarget.Internal)));
 if (signalNineConfig.JobSystem.RunInProcessWorker)
 {
     builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWorkerService(
         sp.GetRequiredService<SignalNineConfig>(),
         sp.GetServices<IJobHandler>(),
         sp.GetRequiredService<IJobManager>(),
-        sp.GetRequiredService<SignalNine.Core.Interfaces.IJobBus>(),
-        SignalNine.Core.Data.Jobs.JobStreamTarget.Workers)));
+        sp.GetRequiredService<IJobBus>(),
+        JobStreamTarget.Workers)));
 }
 builder.Services.AddHostedService<JobBusToManagerAdapter>();
 builder.Services.AddHostedService<LogsBroadcastService>();
@@ -180,7 +186,7 @@ var healthChecks = builder.Services.AddHealthChecks()
        .AddCheck<FreeSqlHealthCheck>("database");
 if (!string.IsNullOrWhiteSpace(signalNineConfig.Redis.Url))
 {
-    healthChecks.AddCheck<SignalNine.Web.Services.RedisHealthCheck>("redis");
+    healthChecks.AddCheck<RedisHealthCheck>("redis");
 }
 
 builder.Services.AddSignalR();
