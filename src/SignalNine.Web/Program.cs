@@ -126,11 +126,14 @@ builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWo
     sp.GetServices<IJobHandler>(),
     sp.GetRequiredService<IJobManager>(),
     SignalNine.Core.Data.Jobs.JobStreamTarget.Internal)));
-builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWorkerService(
-    sp.GetRequiredService<SignalNineConfig>(),
-    sp.GetServices<IJobHandler>(),
-    sp.GetRequiredService<IJobManager>(),
-    SignalNine.Core.Data.Jobs.JobStreamTarget.Workers)));
+if (signalNineConfig.JobSystem.RunInProcessWorker)
+{
+    builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWorkerService(
+        sp.GetRequiredService<SignalNineConfig>(),
+        sp.GetServices<IJobHandler>(),
+        sp.GetRequiredService<IJobManager>(),
+        SignalNine.Core.Data.Jobs.JobStreamTarget.Workers)));
+}
 builder.Services.AddHostedService<JobBusToManagerAdapter>();
 builder.Services.AddHostedService<LogsBroadcastService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
