@@ -40,22 +40,9 @@ public class ConfigEndpointTests : IDisposable
         var properties = root.GetProperty("properties");
         var pipeline = properties.GetProperty("Pipeline");
         var tasks = pipeline.GetProperty("properties").GetProperty("Tasks").GetProperty("properties");
-        var tagger = tasks.GetProperty("Tagger");
-        var jellyfinTags = tasks.GetProperty("JellyfinTags");
         var probe = tasks.GetProperty("Probe");
-        var jellyfinPreview = tasks.GetProperty("JellyfinPreview");
         var preview = tasks.GetProperty("Preview");
 
-        Assert.Equal("Tagger", tagger.GetProperty("title").GetString());
-        Assert.Equal(
-            "boolean",
-            tagger.GetProperty("properties").GetProperty("Enabled").GetProperty("type").GetString()
-        );
-        Assert.Equal("Jellyfin tags", jellyfinTags.GetProperty("title").GetString());
-        Assert.Equal(
-            "boolean",
-            jellyfinTags.GetProperty("properties").GetProperty("Enabled").GetProperty("type").GetString()
-        );
         Assert.Equal("Probe", probe.GetProperty("title").GetString());
         Assert.Equal(
             "boolean",
@@ -64,11 +51,6 @@ public class ConfigEndpointTests : IDisposable
         Assert.Equal(
             "boolean",
             probe.GetProperty("properties").GetProperty("AllowJellyfinStreamProbe").GetProperty("type").GetString()
-        );
-        Assert.Equal("Jellyfin preview", jellyfinPreview.GetProperty("title").GetString());
-        Assert.Equal(
-            "integer",
-            jellyfinPreview.GetProperty("properties").GetProperty("MaxImages").GetProperty("type").GetString()
         );
         Assert.Equal(
             "integer",

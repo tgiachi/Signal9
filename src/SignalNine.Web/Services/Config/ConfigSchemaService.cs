@@ -1,6 +1,6 @@
 using SignalNine.Core.Data.Config.Schema;
 using SignalNine.Core.Types;
-using SignalNine.Jobs.Interfaces;
+using SignalNine.Web.Interfaces;
 
 namespace SignalNine.Web.Services.Config;
 
