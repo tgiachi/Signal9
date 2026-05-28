@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Film, Filter, Play, RefreshCw, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
@@ -162,7 +162,7 @@ function MediaRow({
       >
         {media.isActive ? 'active' : 'paused'}
       </span>
-      <PreviewStrip mediaId={media.id} title={media.title} />
+      <PreviewCarousel mediaId={media.id} title={media.title} />
       <button
         type="button"
         aria-label={`Run pipeline for ${media.title}`}
@@ -240,23 +240,79 @@ function FilterBar({
   );
 }
 
-function PreviewStrip({ mediaId, title }: { mediaId: string; title: string }) {
+const MAX_PREVIEW_COUNT = 5;
+const PREVIEW_ROTATE_MS = 300;
+
+function PreviewCarousel({ mediaId, title }: { mediaId: string; title: string }) {
+  const [index, setIndex] = useState(1);
+  const [hovering, setHovering] = useState(false);
+  const [invalid, setInvalid] = useState<Set<number>>(() => new Set());
+
+  useEffect(() => {
+    if (!hovering) return undefined;
+    const id = window.setInterval(() => {
+      setIndex((prev) => {
+        let candidate = prev;
+        for (let i = 0; i < MAX_PREVIEW_COUNT; i++) {
+          candidate = (candidate % MAX_PREVIEW_COUNT) + 1;
+          if (!invalid.has(candidate)) return candidate;
+        }
+        return prev;
+      });
+    }, PREVIEW_ROTATE_MS);
+    return () => window.clearInterval(id);
+  }, [hovering, invalid]);
+
+  const allInvalid = invalid.size >= MAX_PREVIEW_COUNT;
+
   return (
-    <div className="flex gap-1">
-      {[1, 2, 3].map((index) => (
+    <div
+      data-testid="preview-carousel"
+      className="group relative h-12 w-20 overflow-hidden rounded-[4px] bg-bg-1"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => {
+        setHovering(false);
+        setIndex(1);
+      }}
+    >
+      {allInvalid ? (
+        <div className="flex size-full items-center justify-center font-mono text-[9px] text-fg-3">
+          no preview
+        </div>
+      ) : (
         <img
-          key={index}
           src={previewUrl(mediaId, index)}
           alt={`${title} preview ${index}`}
           loading="lazy"
           decoding="async"
-          className="h-10 w-14 rounded-[3px] bg-bg-1 object-cover text-[0]"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none';
+          className="size-full object-cover"
+          onError={() => {
+            setInvalid((prev) => {
+              if (prev.has(index)) return prev;
+              const next = new Set(prev);
+              next.add(index);
+              return next;
+            });
           }}
         />
-      ))}
-      <span className="self-center font-mono text-[10px] text-fg-3">previews</span>
+      )}
+      {hovering && !allInvalid && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center gap-0.5 bg-gradient-to-t from-bg-5/80 to-transparent px-1 py-0.5">
+          {Array.from({ length: MAX_PREVIEW_COUNT }, (_, i) => i + 1).map((n) => (
+            <span
+              key={n}
+              className={
+                'h-0.5 w-2 rounded-full ' +
+                (n === index
+                  ? 'bg-accent-live'
+                  : invalid.has(n)
+                    ? 'bg-bg-2 opacity-30'
+                    : 'bg-fg-3 opacity-50')
+              }
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
