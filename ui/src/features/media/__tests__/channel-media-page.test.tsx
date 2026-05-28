@@ -67,10 +67,11 @@ describe('ChannelMediaPage', () => {
     renderPage();
 
     expect(await screen.findByText('The Signal')).toBeInTheDocument();
-    expect(screen.getByText('Movies media')).toBeInTheDocument();
+    expect(screen.getByText(/A\. Director/)).toBeInTheDocument();
     expect(screen.getByText('01:01:01')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /run pipeline for The Signal/i }));
+    await userEvent.click(screen.getByRole('button', { name: /more actions for The Signal/i }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /pipeline/i }));
 
     await waitFor(() =>
       expect(

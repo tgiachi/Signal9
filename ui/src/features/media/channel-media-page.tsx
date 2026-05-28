@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
   Film,
   Filter,
+  MoreVertical,
   Play,
   RefreshCw,
   Search,
@@ -279,6 +280,74 @@ function mediaMatchesQuery(media: ChannelMediaResponse, needle: string): boolean
   return false;
 }
 
+function MediaCardMenu({
+  media,
+  isRunning,
+  onRunPipeline,
+}: {
+  media: ChannelMediaResponse;
+  isRunning: boolean;
+  onRunPipeline: (media: ChannelMediaResponse) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handler = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('mousedown', handler);
+    window.addEventListener('keydown', escape);
+    return () => {
+      window.removeEventListener('mousedown', handler);
+      window.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+
+  const pipelineDisabled = !media.isActive || isRunning;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label={`More actions for ${media.title}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex size-7 items-center justify-center rounded-[6px] bg-bg-3 text-fg-2 transition hover:bg-[#343b41] hover:text-fg-0"
+      >
+        <MoreVertical className="size-3.5" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute bottom-full right-0 z-20 mb-1 min-w-[10rem] overflow-hidden rounded-[6px] bg-bg-4"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            disabled={pipelineDisabled}
+            onClick={() => {
+              setOpen(false);
+              onRunPipeline(media);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-fg-1 transition hover:bg-bg-2 disabled:text-fg-3 disabled:hover:bg-transparent"
+          >
+            <Play className="size-3.5 text-accent-jobs" />
+            Pipeline
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MediaCard({
   media,
   onRunPipeline,
@@ -346,16 +415,11 @@ function MediaCard({
           <span className="truncate font-mono text-[10px] text-fg-3">
             {sourceTypeLabel(media.sourceType)}
           </span>
-          <button
-            type="button"
-            aria-label={`Run pipeline for ${media.title}`}
-            disabled={!media.isActive || isRunning}
-            onClick={() => onRunPipeline(media)}
-            className="inline-flex w-fit items-center gap-1 rounded-[6px] bg-accent-jobs px-2 py-1 text-[10px] font-semibold uppercase tracking-label text-fg-0 transition hover:opacity-90 disabled:bg-bg-1 disabled:text-fg-3 disabled:opacity-40"
-          >
-            <Play className="size-3" />
-            Pipeline
-          </button>
+          <MediaCardMenu
+            media={media}
+            isRunning={isRunning}
+            onRunPipeline={onRunPipeline}
+          />
         </div>
       </div>
     </article>
