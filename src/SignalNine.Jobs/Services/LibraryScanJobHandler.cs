@@ -4,12 +4,11 @@ using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Data.Jobs.Results;
-using SignalNine.Core.Data.Pipeline;
 using SignalNine.Core.Interfaces;
-using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
+using ChannelMediaType = SignalNine.Persistence.Types.ChannelMediaType;
 
 namespace SignalNine.Jobs.Services;
 
@@ -40,8 +39,6 @@ public class LibraryScanJobHandler : IJobHandler
         var jellyfin = sp.GetRequiredService<IJellyfinService>();
         var walker = sp.GetRequiredService<ILocalLibraryWalker>();
         var libraries = sp.GetRequiredService<IDataAccess<MediaLibraryEntity>>();
-        var media = sp.GetRequiredService<IDataAccess<ChannelMediaEntity>>();
-        var jobs = sp.GetRequiredService<IJobManager>();
 
         var library = libraries.GetByKey(payload.MediaLibraryId)
                       ?? throw new InvalidOperationException($"MediaLibrary {payload.MediaLibraryId} not found.");
@@ -51,19 +48,20 @@ public class LibraryScanJobHandler : IJobHandler
             throw new InvalidOperationException($"MediaLibrary {library.Id} is inactive.");
         }
 
+        var items = new List<ScannedItem>();
         var processed = 0;
 
         switch (library.SourceType)
         {
             case MediaSourceType.Jellyfin:
-                var items = await jellyfin.ListItemsAsync(library.SourceRef, cancellationToken).ConfigureAwait(false);
-                var total = items.Count;
-                foreach (var item in items)
+                var jellyfinItems = await jellyfin.ListItemsAsync(library.SourceRef, cancellationToken).ConfigureAwait(false);
+                var total = jellyfinItems.Count;
+                foreach (var item in jellyfinItems)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await TryUpsertJellyfinItemAsync(media, jobs, library, item, context).ConfigureAwait(false);
+                    items.Add(BuildScannedItemFromJellyfin(library, item));
                     processed++;
-                    await MaybeReportProgressAsync(jobs, context, processed, total, cancellationToken).ConfigureAwait(false);
+                    await MaybeReportProgressAsync(context, processed, total, cancellationToken).ConfigureAwait(false);
                 }
                 break;
 
@@ -72,9 +70,9 @@ public class LibraryScanJobHandler : IJobHandler
                 foreach (var item in localItems)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await TryUpsertLocalItemAsync(media, jobs, library, item, context).ConfigureAwait(false);
+                    items.Add(BuildScannedItemFromLocal(item));
                     processed++;
-                    await MaybeReportProgressAsync(jobs, context, processed, localItems.Count, cancellationToken).ConfigureAwait(false);
+                    await MaybeReportProgressAsync(context, processed, localItems.Count, cancellationToken).ConfigureAwait(false);
                 }
                 break;
 
@@ -85,179 +83,54 @@ public class LibraryScanJobHandler : IJobHandler
                 throw new NotSupportedException($"Unknown source type {library.SourceType}.");
         }
 
-        library.LastScannedAt = DateTime.UtcNow;
-        library.UpdatedAt = DateTime.UtcNow;
-        libraries.Update(library);
-
-        // Stub result — will be replaced with typed LibraryScanResult in T8-T11
-        return new EmptyJobResult(JobType);
+        return new LibraryScanResult(library.Id, items);
     }
 
-    // Kept as a literal to avoid coupling this handler to MediaPipelineJobHandler.
-    private const string PipelineJobType = "media.pipeline";
-
-    private static async Task TryUpsertJellyfinItemAsync(
-        IDataAccess<ChannelMediaEntity> media,
-        IJobManager jobs,
-        MediaLibraryEntity library,
-        JellyfinItem item,
-        JobExecutionContext context
-    )
+    private static ScannedItem BuildScannedItemFromJellyfin(MediaLibraryEntity library, JellyfinItem item)
     {
-        try
-        {
-            var existing = FindExisting(media, library.Id, MediaSourceType.Jellyfin, item.Id);
-            if (existing is null)
-            {
-                var inserted = media.Insert(BuildChannelMediaFromJellyfin(library, item));
-                await EnqueuePipelineForNewAsync(jobs, inserted.Id, context).ConfigureAwait(false);
-            }
-            else
-            {
-                MutateFromJellyfin(existing, library, item);
-                media.Update(existing);
-            }
-        }
-        catch (Exception ex)
-        {
-            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
-                $"Failed to upsert Jellyfin item {item.Id}: {ex.Message}", CancellationToken.None).ConfigureAwait(false);
-        }
-    }
+        int? movieReleaseYear = null;
+        string? tvSeriesName = null;
+        int? tvSeason = null;
+        int? tvEpisode = null;
 
-    private static async Task TryUpsertLocalItemAsync(
-        IDataAccess<ChannelMediaEntity> media,
-        IJobManager jobs,
-        MediaLibraryEntity library,
-        LocalLibraryItem item,
-        JobExecutionContext context
-    )
-    {
-        try
-        {
-            var existing = FindExisting(media, library.Id, MediaSourceType.LocalFile, item.RelativePath);
-            if (existing is null)
-            {
-                var inserted = media.Insert(BuildChannelMediaFromLocal(library, item));
-                await EnqueuePipelineForNewAsync(jobs, inserted.Id, context).ConfigureAwait(false);
-            }
-            else
-            {
-                MutateFromLocal(existing, library, item);
-                media.Update(existing);
-            }
-        }
-        catch (Exception ex)
-        {
-            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
-                $"Failed to upsert local file {item.RelativePath}: {ex.Message}", CancellationToken.None).ConfigureAwait(false);
-        }
-    }
-
-    private static async Task EnqueuePipelineForNewAsync(
-        IJobManager jobs,
-        Guid channelMediaId,
-        JobExecutionContext context
-    )
-    {
-        try
-        {
-            var payload = JsonSerializer.Serialize(new MediaPipelinePayload(channelMediaId));
-            var snap = await jobs.EnqueueAsync(
-                new EnqueueJobCommand { Type = PipelineJobType, PayloadJson = payload },
-                CancellationToken.None
-            ).ConfigureAwait(false);
-
-            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Information,
-                $"Enqueued media.pipeline job {snap.Id} for ChannelMedia {channelMediaId}",
-                CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            await jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
-                $"Failed to enqueue media.pipeline for {channelMediaId}: {ex.Message}",
-                CancellationToken.None).ConfigureAwait(false);
-        }
-    }
-
-    private static ChannelMediaEntity? FindExisting(
-        IDataAccess<ChannelMediaEntity> media,
-        Guid mediaLibraryId,
-        MediaSourceType sourceType,
-        string sourceRef
-    )
-    {
-        return media.List().FirstOrDefault(m =>
-            m.MediaLibraryId == mediaLibraryId &&
-            m.SourceType == sourceType &&
-            m.SourceRef == sourceRef);
-    }
-
-    private static ChannelMediaEntity BuildChannelMediaFromJellyfin(MediaLibraryEntity library, JellyfinItem item)
-    {
-        var entity = new ChannelMediaEntity
-        {
-            Id = Guid.NewGuid(),
-            Type = library.DefaultMediaType,
-            Title = item.Name,
-            DurationSeconds = TicksToSeconds(item.RunTimeTicks),
-            IsActive = true,
-            SourceType = MediaSourceType.Jellyfin,
-            SourceRef = item.Id,
-            MediaLibraryId = library.Id,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-        ApplyTypeSpecificFromJellyfin(entity, library, item);
-        return entity;
-    }
-
-    private static void MutateFromJellyfin(ChannelMediaEntity existing, MediaLibraryEntity library, JellyfinItem item)
-    {
-        existing.Title = item.Name;
-        existing.DurationSeconds = TicksToSeconds(item.RunTimeTicks);
-        existing.Type = library.DefaultMediaType;
-        existing.UpdatedAt = DateTime.UtcNow;
-        ApplyTypeSpecificFromJellyfin(existing, library, item);
-    }
-
-    private static void ApplyTypeSpecificFromJellyfin(ChannelMediaEntity entity, MediaLibraryEntity library, JellyfinItem item)
-    {
         switch (library.DefaultMediaType)
         {
             case ChannelMediaType.Movies:
-                entity.MovieReleaseYear = item.ProductionYear;
+                movieReleaseYear = item.ProductionYear;
                 break;
             case ChannelMediaType.TvShow:
-                entity.TvSeriesName = item.SeriesName;
-                entity.TvSeason = item.ParentIndexNumber;
-                entity.TvEpisode = item.IndexNumber;
+                tvSeriesName = item.SeriesName;
+                tvSeason = item.ParentIndexNumber;
+                tvEpisode = item.IndexNumber;
                 break;
         }
+
+        return new ScannedItem(
+            Title: item.Name,
+            SourceRef: item.Id,
+            SourceType: (int)MediaSourceType.Jellyfin,
+            DurationSeconds: TicksToSeconds(item.RunTimeTicks),
+            MovieReleaseYear: movieReleaseYear,
+            MovieDirector: null,
+            TvSeriesName: tvSeriesName,
+            TvSeason: tvSeason,
+            TvEpisode: tvEpisode
+        );
     }
 
-    private static ChannelMediaEntity BuildChannelMediaFromLocal(MediaLibraryEntity library, LocalLibraryItem item)
+    private static ScannedItem BuildScannedItemFromLocal(LocalLibraryItem item)
     {
-        return new ChannelMediaEntity
-        {
-            Id = Guid.NewGuid(),
-            Type = library.DefaultMediaType,
-            Title = item.Title,
-            DurationSeconds = null,
-            IsActive = true,
-            SourceType = MediaSourceType.LocalFile,
-            SourceRef = item.RelativePath,
-            MediaLibraryId = library.Id,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-    }
-
-    private static void MutateFromLocal(ChannelMediaEntity existing, MediaLibraryEntity library, LocalLibraryItem item)
-    {
-        existing.Title = item.Title;
-        existing.Type = library.DefaultMediaType;
-        existing.UpdatedAt = DateTime.UtcNow;
+        return new ScannedItem(
+            Title: item.Title,
+            SourceRef: item.RelativePath,
+            SourceType: (int)MediaSourceType.LocalFile,
+            DurationSeconds: null,
+            MovieReleaseYear: null,
+            MovieDirector: null,
+            TvSeriesName: null,
+            TvSeason: null,
+            TvEpisode: null
+        );
     }
 
     private static int? TicksToSeconds(long? ticks)
@@ -266,7 +139,6 @@ public class LibraryScanJobHandler : IJobHandler
     }
 
     private static async Task MaybeReportProgressAsync(
-        IJobManager jobs,
         JobExecutionContext context,
         int processed,
         int total,
@@ -276,6 +148,6 @@ public class LibraryScanJobHandler : IJobHandler
         if (processed % ProgressReportInterval != 0 && processed != total) return;
 
         var percent = total == 0 ? 100 : Math.Clamp(processed * 100 / total, 0, 100);
-        await jobs.ReportProgressAsync(context.JobId, percent, $"Processed {processed}/{total}", ct).ConfigureAwait(false);
+        await context.ReportProgressAsync(percent, $"Processed {processed}/{total}", ct).ConfigureAwait(false);
     }
 }

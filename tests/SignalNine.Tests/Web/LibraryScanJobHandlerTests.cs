@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Jobs.Results;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services;
-using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
@@ -15,31 +15,27 @@ namespace SignalNine.Tests.Web;
 
 public class LibraryScanJobHandlerTests
 {
-    private static (LibraryScanJobHandler Handler, StubMediaDataAccess Media, StubLibraryDataAccess Libraries, StubJellyfin Jellyfin, StubWalker Walker, StubJobManager Jobs)
+    private static (LibraryScanJobHandler Handler, StubLibraryDataAccess Libraries, StubJellyfin Jellyfin, StubWalker Walker)
         Build()
     {
         var jellyfin = new StubJellyfin();
         var walker = new StubWalker();
         var libraries = new StubLibraryDataAccess();
-        var media = new StubMediaDataAccess();
-        var jobs = new StubJobManager();
 
         var services = new ServiceCollection();
         services.AddScoped<IJellyfinService>(_ => jellyfin);
         services.AddScoped<ILocalLibraryWalker>(_ => walker);
         services.AddScoped<IDataAccess<MediaLibraryEntity>>(_ => libraries);
-        services.AddScoped<IDataAccess<ChannelMediaEntity>>(_ => media);
-        services.AddScoped<IJobManager>(_ => jobs);
         var sp = services.BuildServiceProvider();
 
         var handler = new LibraryScanJobHandler(sp.GetRequiredService<IServiceScopeFactory>());
-        return (handler, media, libraries, jellyfin, walker, jobs);
+        return (handler, libraries, jellyfin, walker);
     }
 
     private static JobExecutionContext NewContext(Guid mediaLibraryId)
     {
         var payload = JsonSerializer.Serialize(new ScanLibraryPayload(mediaLibraryId));
-        var workDir = Path.Combine(Path.GetTempPath(), $"signalnine-tests-{Guid.NewGuid():N}");
+        var workDir = Path.Combine(Path.GetTempPath(), $"scan-test-{Guid.NewGuid():N}");
         return new JobExecutionContext(Guid.NewGuid(), payload, workDir, new InMemoryJobBus());
     }
 
@@ -70,9 +66,23 @@ public class LibraryScanJobHandlerTests
     }
 
     [Fact]
-    public async Task FirstScan_JellyfinMovies_Inserts3Rows()
+    public async Task EmptyJellyfinLibrary_ReturnsZeroItems()
     {
-        var (handler, media, libraries, jellyfin, _, _) = Build();
+        var (handler, libraries, jellyfin, _) = Build();
+        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
+        libraries.Add(lib);
+        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>();
+
+        var result = (LibraryScanResult)await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
+
+        Assert.Empty(result.Items);
+        Assert.Equal(lib.Id, result.LibraryId);
+    }
+
+    [Fact]
+    public async Task JellyfinMovies_ReturnsNItems_WithCorrectFields()
+    {
+        var (handler, libraries, jellyfin, _) = Build();
         var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
         libraries.Add(lib);
         jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
@@ -82,70 +92,23 @@ public class LibraryScanJobHandlerTests
             new("jf-3", "Heat", "Movie", 10200L * 10_000_000, 1995, null, null, null, null)
         };
 
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
+        var result = (LibraryScanResult)await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
 
-        var rows = media.List();
-        Assert.Equal(3, rows.Count);
-        Assert.All(rows, r => Assert.Equal(lib.Id, r.MediaLibraryId));
-        Assert.All(rows, r => Assert.Equal(ChannelMediaType.Movies, r.Type));
-        Assert.All(rows, r => Assert.Equal(MediaSourceType.Jellyfin, r.SourceType));
-        var dieHard = rows.Single(r => r.SourceRef == "jf-1");
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(lib.Id, result.LibraryId);
+
+        var dieHard = result.Items.Single(i => i.SourceRef == "jf-1");
         Assert.Equal("Die Hard", dieHard.Title);
         Assert.Equal(7320, dieHard.DurationSeconds);
         Assert.Equal(1988, dieHard.MovieReleaseYear);
-    }
-
-    [Fact]
-    public async Task ReScan_Jellyfin_UpsertsWithoutDuplicates()
-    {
-        var (handler, media, libraries, jellyfin, _, _) = Build();
-        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
-        libraries.Add(lib);
-        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
-        {
-            new("jf-1", "Die Hard", "Movie", 7320L * 10_000_000, 1988, null, null, null, null)
-        };
-
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-        Assert.Single(media.List());
-
-        jellyfin.Items["jf-lib-1"][0] = new JellyfinItem(
-            "jf-1", "Die Hard (Remastered)", "Movie", 7320L * 10_000_000, 1988, null, null, null, null);
-
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-
-        var rows = media.List();
-        Assert.Single(rows);
-        Assert.Equal("Die Hard (Remastered)", rows[0].Title);
-    }
-
-    [Fact]
-    public async Task ReScan_AfterItemRemoved_LeavesOrphan()
-    {
-        var (handler, media, libraries, jellyfin, _, _) = Build();
-        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
-        libraries.Add(lib);
-        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
-        {
-            new("jf-1", "Die Hard", "Movie", 7320L * 10_000_000, 1988, null, null, null, null),
-            new("jf-2", "Aliens", "Movie", 8400L * 10_000_000, 1986, null, null, null, null)
-        };
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-        Assert.Equal(2, media.List().Count);
-
-        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
-        {
-            new("jf-1", "Die Hard", "Movie", 7320L * 10_000_000, 1988, null, null, null, null)
-        };
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-
-        Assert.Equal(2, media.List().Count);
+        Assert.Equal((int)MediaSourceType.Jellyfin, dieHard.SourceType);
+        Assert.All(result.Items, i => Assert.Equal((int)MediaSourceType.Jellyfin, i.SourceType));
     }
 
     [Fact]
     public async Task JellyfinTvShow_MapsSeriesSeasonEpisode()
     {
-        var (handler, media, libraries, jellyfin, _, _) = Build();
+        var (handler, libraries, jellyfin, _) = Build();
         var lib = NewJellyfinLibrary(ChannelMediaType.TvShow);
         libraries.Add(lib);
         jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
@@ -153,19 +116,20 @@ public class LibraryScanJobHandlerTests
             new("ep-1", "Pilot", "Episode", 2700L * 10_000_000, null, null, "Breaking Bad", 1, 1)
         };
 
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
+        var result = (LibraryScanResult)await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
 
-        var row = media.List().Single();
-        Assert.Equal(ChannelMediaType.TvShow, row.Type);
-        Assert.Equal("Breaking Bad", row.TvSeriesName);
-        Assert.Equal(1, row.TvSeason);
-        Assert.Equal(1, row.TvEpisode);
+        Assert.Single(result.Items);
+        var item = result.Items[0];
+        Assert.Equal("Breaking Bad", item.TvSeriesName);
+        Assert.Equal(1, item.TvSeason);
+        Assert.Equal(1, item.TvEpisode);
+        Assert.Null(item.MovieReleaseYear);
     }
 
     [Fact]
-    public async Task LocalFile_Library_Inserts4Rows()
+    public async Task LocalFile_ReturnsNItems_WithCorrectFields()
     {
-        var (handler, media, libraries, _, walker, _) = Build();
+        var (handler, libraries, _, walker) = Build();
         var lib = NewLocalLibrary(ChannelMediaType.Movies);
         libraries.Add(lib);
         walker.Items["/media/movies"] = new List<LocalLibraryItem>
@@ -176,49 +140,42 @@ public class LibraryScanJobHandlerTests
             new("d.avi", "d", 400)
         };
 
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
+        var result = (LibraryScanResult)await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
 
-        var rows = media.List();
-        Assert.Equal(4, rows.Count);
-        Assert.All(rows, r => Assert.Equal(MediaSourceType.LocalFile, r.SourceType));
-        Assert.All(rows, r => Assert.Null(r.DurationSeconds));
-        Assert.Contains(rows, r => r.SourceRef == "sub/b.mkv" && r.Title == "b");
+        Assert.Equal(4, result.Items.Count);
+        Assert.All(result.Items, i => Assert.Equal((int)MediaSourceType.LocalFile, i.SourceType));
+        Assert.All(result.Items, i => Assert.Null(i.DurationSeconds));
+
+        var b = result.Items.Single(i => i.SourceRef == "sub/b.mkv");
+        Assert.Equal("b", b.Title);
     }
 
     [Fact]
-    public async Task LocalFile_ReScan_NoDuplicates()
+    public async Task InactiveLibrary_ThrowsInvalidOperationException()
     {
-        var (handler, media, libraries, _, walker, _) = Build();
-        var lib = NewLocalLibrary(ChannelMediaType.Movies);
+        var (handler, libraries, _, _) = Build();
+        var lib = NewJellyfinLibrary(ChannelMediaType.Movies, active: false);
         libraries.Add(lib);
-        walker.Items["/media/movies"] = new List<LocalLibraryItem>
-        {
-            new("a.mp4", "a", 100)
-        };
 
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-
-        Assert.Single(media.List());
-    }
-
-    [Fact]
-    public async Task LocalFile_RootMissing_Throws()
-    {
-        var (handler, _, libraries, _, walker, _) = Build();
-        var lib = NewLocalLibrary(ChannelMediaType.Movies);
-        libraries.Add(lib);
-        walker.ThrowDirectoryNotFound = true;
-
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+        await Assert.ThrowsAsync<InvalidOperationException>(
             () => handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None)
         );
     }
 
     [Fact]
-    public async Task UrlSource_ThrowsNotSupported()
+    public async Task MissingLibrary_Throws()
     {
-        var (handler, _, libraries, _, _, _) = Build();
+        var (handler, _, _, _) = Build();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.ExecuteAsync(NewContext(Guid.NewGuid()), CancellationToken.None)
+        );
+    }
+
+    [Fact]
+    public async Task UrlSource_ThrowsNotSupportedException()
+    {
+        var (handler, libraries, _, _) = Build();
         var lib = new MediaLibraryEntity
         {
             Id = Guid.NewGuid(),
@@ -236,85 +193,9 @@ public class LibraryScanJobHandlerTests
     }
 
     [Fact]
-    public async Task InactiveLibrary_Throws()
+    public async Task Cancellation_ThrowsOperationCanceledException()
     {
-        var (handler, _, libraries, _, _, _) = Build();
-        var lib = NewJellyfinLibrary(ChannelMediaType.Movies, active: false);
-        libraries.Add(lib);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None)
-        );
-    }
-
-    [Fact]
-    public async Task MissingLibrary_Throws()
-    {
-        var (handler, _, _, _, _, _) = Build();
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => handler.ExecuteAsync(NewContext(Guid.NewGuid()), CancellationToken.None)
-        );
-    }
-
-    [Fact]
-    public async Task LastScannedAt_UpdatedOnSuccess()
-    {
-        var (handler, _, libraries, jellyfin, _, _) = Build();
-        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
-        libraries.Add(lib);
-        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>();
-
-        var before = lib.LastScannedAt;
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-
-        Assert.NotEqual(before, libraries.GetByKey(lib.Id)!.LastScannedAt);
-        Assert.NotNull(libraries.GetByKey(lib.Id)!.LastScannedAt);
-    }
-
-    [Fact]
-    public async Task Scan_NewItems_EnqueuesMediaPipelineJobs()
-    {
-        var (handler, _, libraries, jellyfin, _, jobs) = Build();
-        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
-        libraries.Add(lib);
-        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
-        {
-            new("jf-1", "Die Hard", "Movie", 7320L * 10_000_000, 1988, null, null, null, null),
-            new("jf-2", "Aliens", "Movie", 8400L * 10_000_000, 1986, null, null, null, null)
-        };
-
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-
-        Assert.Equal(2, jobs.Enqueued.Count);
-        Assert.All(jobs.Enqueued, j => Assert.Equal("media.pipeline", j.Type));
-    }
-
-    [Fact]
-    public async Task Scan_ExistingItems_DoNotEnqueuePipeline()
-    {
-        var (handler, _, libraries, jellyfin, _, jobs) = Build();
-        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
-        libraries.Add(lib);
-        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
-        {
-            new("jf-1", "Die Hard", "Movie", 7320L * 10_000_000, 1988, null, null, null, null)
-        };
-
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-        Assert.Single(jobs.Enqueued);
-
-        // Re-scan: the same item already exists, so no new pipeline job.
-        jobs.Enqueued.Clear();
-        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
-
-        Assert.Empty(jobs.Enqueued);
-    }
-
-    [Fact]
-    public async Task Cancellation_AbortsScan()
-    {
-        var (handler, _, libraries, jellyfin, _, _) = Build();
+        var (handler, libraries, jellyfin, _) = Build();
         var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
         libraries.Add(lib);
         jellyfin.Items["jf-lib-1"] = Enumerable.Range(0, 100)
@@ -391,124 +272,36 @@ public class LibraryScanJobHandlerTests
     private sealed class StubLibraryDataAccess : IDataAccess<MediaLibraryEntity>
     {
         private readonly List<MediaLibraryEntity> _rows = new();
+
         public void Add(MediaLibraryEntity e)
         {
             _rows.Add(e);
         }
+
         public MediaLibraryEntity? GetByKey(object key)
         {
             return _rows.FirstOrDefault(r => r.Id.Equals(key));
         }
+
         public IReadOnlyList<MediaLibraryEntity> List()
         {
             return _rows;
         }
+
         public MediaLibraryEntity Insert(MediaLibraryEntity entity)
         {
             _rows.Add(entity);
             return entity;
         }
+
         public int Update(MediaLibraryEntity entity)
         {
             return 1;
         }
+
         public int Delete(object key)
         {
             return _rows.RemoveAll(r => r.Id.Equals(key));
-        }
-    }
-
-    private sealed class StubMediaDataAccess : IDataAccess<ChannelMediaEntity>
-    {
-        private readonly List<ChannelMediaEntity> _rows = new();
-        public ChannelMediaEntity? GetByKey(object key)
-        {
-            return _rows.FirstOrDefault(r => r.Id.Equals(key));
-        }
-        public IReadOnlyList<ChannelMediaEntity> List()
-        {
-            return _rows;
-        }
-        public ChannelMediaEntity Insert(ChannelMediaEntity entity)
-        {
-            _rows.Add(entity);
-            return entity;
-        }
-        public int Update(ChannelMediaEntity entity)
-        {
-            return 1;
-        }
-        public int Delete(object key)
-        {
-            return _rows.RemoveAll(r => r.Id.Equals(key));
-        }
-    }
-
-    private sealed class StubJobManager : IJobManager
-    {
-        public List<EnqueueJobCommand> Enqueued { get; } = new();
-
-        public Task<JobSnapshot> EnqueueAsync(EnqueueJobCommand command, CancellationToken cancellationToken = default)
-        {
-            Enqueued.Add(command);
-            return Task.FromResult(new JobSnapshot
-            {
-                Id = Guid.NewGuid(),
-                Type = command.Type,
-                PayloadJson = command.PayloadJson
-            });
-        }
-        public IReadOnlyList<JobSnapshot> List()
-        {
-            return Array.Empty<JobSnapshot>();
-        }
-        public JobSnapshot? GetById(Guid jobId)
-        {
-            return null;
-        }
-        public IReadOnlyList<JobLogEntry> GetLogs(Guid jobId)
-        {
-            return Array.Empty<JobLogEntry>();
-        }
-        public Task<bool> CancelAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(false);
-        }
-        public ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
-            => DequeueAsync(cancellationToken);
-
-        public Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-        public Task CompleteAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-        public Task FailAsync(Guid jobId, Exception exception, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-        public Task MarkCanceledAsync(Guid jobId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-        public Task ReportProgressAsync(Guid jobId, int percent, string message, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-        public Task WriteLogAsync(Guid jobId, JobLogLevelType level, string message, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-        public CancellationToken GetCancellationToken(Guid jobId)
-        {
-            return CancellationToken.None;
         }
     }
 }
