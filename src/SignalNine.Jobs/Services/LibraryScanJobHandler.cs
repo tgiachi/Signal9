@@ -10,7 +10,7 @@ using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
 
-namespace SignalNine.Web.Services;
+namespace SignalNine.Jobs.Services;
 
 public class LibraryScanJobHandler : IJobHandler
 {

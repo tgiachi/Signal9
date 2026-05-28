@@ -8,7 +8,7 @@ using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
-using SignalNine.Web.Services;
+using SignalNine.Jobs.Services;
 
 namespace SignalNine.Tests.Web;
 

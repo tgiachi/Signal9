@@ -7,7 +7,7 @@ using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Web.Data.Channels;
 using SignalNine.Web.Data.Jobs;
-using SignalNine.Web.Services;
+using SignalNine.Jobs.Services;
 
 namespace SignalNine.Web.Endpoints;
 

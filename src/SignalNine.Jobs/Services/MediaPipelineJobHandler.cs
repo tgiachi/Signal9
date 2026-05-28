@@ -9,7 +9,7 @@ using SignalNine.Persistence.Interfaces;
 using SignalNine.Jobs.Data.Pipeline;
 using SignalNine.Jobs.Interfaces;
 
-namespace SignalNine.Web.Services;
+namespace SignalNine.Jobs.Services;
 
 public class MediaPipelineJobHandler : IJobHandler
 {

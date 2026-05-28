@@ -9,7 +9,7 @@ using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
 using SignalNine.Jobs.Data.Pipeline;
 using SignalNine.Jobs.Interfaces;
-using SignalNine.Web.Services;
+using SignalNine.Jobs.Services;
 
 namespace SignalNine.Tests.Web.Services;
 
