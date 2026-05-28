@@ -126,17 +126,7 @@ export function ChannelMediaPage() {
           onQueryChange={setQuery}
         />
 
-        <div className="min-h-0 flex-1 overflow-auto bg-bg-0">
-          <div className="grid min-w-[82rem] grid-cols-[8rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-fg-3">
-            <span>Preview</span>
-            <span>Title</span>
-            <span>Media type</span>
-            <span>Duration</span>
-            <span>Source</span>
-            <span>Tags</span>
-            <span>Status</span>
-            <span>Actions</span>
-          </div>
+        <div className="min-h-0 flex-1 overflow-auto bg-bg-0 p-4">
           {channelMedia.isLoading ? (
             <EmptyState text="Loading media catalog." />
           ) : channelMedia.isError ? (
@@ -144,16 +134,17 @@ export function ChannelMediaPage() {
           ) : filtered.length === 0 ? (
             <EmptyState text="No channel media match this view." />
           ) : (
-            paged.map((media, idx) => (
-              <MediaRow
-                key={media.id}
-                media={media}
-                index={idx}
-                onRunPipeline={runPipeline}
-                isRunning={channelMedia.isRunningPipeline}
-                onPlay={setPlaying}
-              />
-            ))
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4">
+              {paged.map((media) => (
+                <MediaCard
+                  key={media.id}
+                  media={media}
+                  onRunPipeline={runPipeline}
+                  isRunning={channelMedia.isRunningPipeline}
+                  onPlay={setPlaying}
+                />
+              ))}
+            </div>
           )}
         </div>
         <PaginationBar
@@ -288,76 +279,86 @@ function mediaMatchesQuery(media: ChannelMediaResponse, needle: string): boolean
   return false;
 }
 
-function MediaRow({
+function MediaCard({
   media,
-  index,
   onRunPipeline,
   isRunning,
   onPlay,
 }: {
   media: ChannelMediaResponse;
-  index: number;
   onRunPipeline: (media: ChannelMediaResponse) => void;
   isRunning: boolean;
   onPlay: (media: ChannelMediaResponse) => void;
 }) {
+  const visibleTags = media.tags.slice(0, 3);
+  const overflowTags = media.tags.length - visibleTags.length;
+
   return (
-    <div
-      className={
-        'grid min-w-[82rem] grid-cols-[8rem_minmax(18rem,1.4fr)_10rem_7rem_minmax(14rem,1fr)_minmax(10rem,0.9fr)_8rem_10rem] items-center gap-3 px-3 py-3 ' +
-        (index % 2 ? 'bg-bg-3' : 'bg-bg-2')
-      }
-    >
-      <PreviewCarousel
-        mediaId={media.id}
-        title={media.title}
-        onClick={() => onPlay(media)}
-      />
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-fg-0">{media.title}</div>
-        <div className="truncate text-[12px] text-fg-3">{typeMetadata(media)}</div>
-      </div>
-      <span className="text-[12px] text-fg-1">{mediaTypeLabel(media.type)}</span>
-      <span className="font-mono text-[12px] text-fg-2">
-        {formatDuration(media.durationSeconds)}
-      </span>
-      <span className="break-all font-mono text-[12px] text-fg-2">
-        {sourceTypeLabel(media.sourceType)} · {media.sourceRef ?? 'none'}
-      </span>
-      <div className="flex min-w-0 flex-wrap gap-1">
-        {media.tags.length === 0 ? (
-          <span className="font-mono text-[10px] text-fg-3">—</span>
-        ) : (
-          media.tags.map((tag) => (
-            <span
-              key={tag.id}
-              title={tag.label ?? tag.name}
-              className="truncate rounded-[3px] bg-accent-cfg px-1.5 py-0.5 font-mono text-[10px] font-semibold text-fg-0"
-            >
-              {tag.label ?? tag.name}
-            </span>
-          ))
+    <article className="group flex flex-col overflow-hidden rounded-[6px] bg-bg-2">
+      <div className="relative">
+        <PreviewCarousel
+          mediaId={media.id}
+          title={media.title}
+          onClick={() => onPlay(media)}
+          className="aspect-video h-auto w-full"
+        />
+        {media.durationSeconds !== null && (
+          <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-[3px] bg-bg-5/85 px-1.5 py-0.5 font-mono text-[10px] text-fg-1">
+            {formatDuration(media.durationSeconds)}
+          </span>
+        )}
+        {!media.isActive && (
+          <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-[3px] bg-accent-warn px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-label text-bg-0">
+            paused
+          </span>
         )}
       </div>
-      <span
-        className={
-          'w-fit rounded-[3px] px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-label ' +
-          (media.isActive ? 'bg-accent-live text-bg-5' : 'bg-accent-warn text-bg-0')
-        }
-      >
-        {media.isActive ? 'active' : 'paused'}
-      </span>
-      <button
-        type="button"
-        aria-label={`Run pipeline for ${media.title}`}
-        disabled={!media.isActive || isRunning}
-        onClick={() => onRunPipeline(media)}
-        className="inline-flex w-fit items-center gap-1 rounded-[6px] bg-accent-jobs px-2.5 py-1.5 text-[12px] font-semibold text-fg-0 transition hover:opacity-90 disabled:bg-bg-1 disabled:text-fg-3 disabled:opacity-40"
-      >
-        <Play className="size-3" />
-        Pipeline
-      </button>
-    </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3">
+        <h3
+          className="line-clamp-2 text-[13px] font-semibold leading-snug text-fg-0"
+          title={media.title}
+        >
+          {media.title}
+        </h3>
+        <div className="truncate font-mono text-[10px] uppercase tracking-label text-fg-3">
+          {mediaTypeLabel(media.type)}
+          {typeMetadata(media) && <span className="normal-case"> · {typeMetadata(media)}</span>}
+        </div>
+        {(visibleTags.length > 0 || overflowTags > 0) && (
+          <div className="flex flex-wrap gap-1">
+            {visibleTags.map((tag) => (
+              <span
+                key={tag.id}
+                title={tag.label ?? tag.name}
+                className="truncate rounded-[3px] bg-accent-cfg px-1.5 py-0.5 font-mono text-[9px] font-semibold text-fg-0"
+              >
+                {tag.label ?? tag.name}
+              </span>
+            ))}
+            {overflowTags > 0 && (
+              <span className="rounded-[3px] bg-bg-3 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-fg-2">
+                +{overflowTags}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+          <span className="truncate font-mono text-[10px] text-fg-3">
+            {sourceTypeLabel(media.sourceType)}
+          </span>
+          <button
+            type="button"
+            aria-label={`Run pipeline for ${media.title}`}
+            disabled={!media.isActive || isRunning}
+            onClick={() => onRunPipeline(media)}
+            className="inline-flex w-fit items-center gap-1 rounded-[6px] bg-accent-jobs px-2 py-1 text-[10px] font-semibold uppercase tracking-label text-fg-0 transition hover:opacity-90 disabled:bg-bg-1 disabled:text-fg-3 disabled:opacity-40"
+          >
+            <Play className="size-3" />
+            Pipeline
+          </button>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -455,10 +456,12 @@ function PreviewCarousel({
   mediaId,
   title,
   onClick,
+  className,
 }: {
   mediaId: string;
   title: string;
   onClick?: () => void;
+  className?: string;
 }) {
   const [index, setIndex] = useState(1);
   const [hovering, setHovering] = useState(false);
@@ -496,7 +499,9 @@ function PreviewCarousel({
         }
       }}
       className={
-        'group relative h-16 w-28 overflow-hidden rounded-[4px] bg-bg-1 ' +
+        'group relative overflow-hidden rounded-[4px] bg-bg-1 ' +
+        (className ?? 'h-16 w-28') +
+        ' ' +
         (onClick
           ? 'cursor-pointer transition hover:ring-2 hover:ring-accent-live focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-live'
           : '')
