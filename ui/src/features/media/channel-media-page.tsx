@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Film, Filter, Play, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Film, Filter, Play, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import {
@@ -30,19 +30,20 @@ export function ChannelMediaPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | string>('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | string>('all');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [query, setQuery] = useState('');
   const [playing, setPlaying] = useState<ChannelMediaResponse | null>(null);
 
-  const filtered = useMemo(
-    () =>
-      channelMedia.media.filter((media) => {
-        if (typeFilter !== 'all' && media.type !== Number(typeFilter)) return false;
-        if (sourceFilter !== 'all' && media.sourceType !== Number(sourceFilter)) return false;
-        if (activeFilter === 'active' && !media.isActive) return false;
-        if (activeFilter === 'inactive' && media.isActive) return false;
-        return true;
-      }),
-    [activeFilter, channelMedia.media, sourceFilter, typeFilter],
-  );
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return channelMedia.media.filter((media) => {
+      if (typeFilter !== 'all' && media.type !== Number(typeFilter)) return false;
+      if (sourceFilter !== 'all' && media.sourceType !== Number(sourceFilter)) return false;
+      if (activeFilter === 'active' && !media.isActive) return false;
+      if (activeFilter === 'inactive' && media.isActive) return false;
+      if (needle === '') return true;
+      return mediaMatchesQuery(media, needle);
+    });
+  }, [activeFilter, channelMedia.media, query, sourceFilter, typeFilter]);
 
   const runPipeline = async (media: ChannelMediaResponse) => {
     try {
@@ -98,9 +99,11 @@ export function ChannelMediaPage() {
           typeFilter={typeFilter}
           sourceFilter={sourceFilter}
           activeFilter={activeFilter}
+          query={query}
           onTypeFilterChange={setTypeFilter}
           onSourceFilterChange={setSourceFilter}
           onActiveFilterChange={setActiveFilter}
+          onQueryChange={setQuery}
         />
 
         <div className="min-h-0 flex-1 overflow-auto bg-bg-0">
@@ -171,6 +174,25 @@ function MediaPlayerDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function mediaMatchesQuery(media: ChannelMediaResponse, needle: string): boolean {
+  const haystack: Array<string | null | undefined> = [
+    media.title,
+    media.sourceRef,
+    media.movieDirector,
+    media.tvSeriesName,
+    media.commercialAdvertiser,
+    media.commercialCampaign,
+    media.informationEdition,
+    mediaTypeLabel(media.type),
+    sourceTypeLabel(media.sourceType),
+    ...media.tags.flatMap((tag) => [tag.name, tag.label]),
+  ];
+  for (const value of haystack) {
+    if (value && value.toLowerCase().includes(needle)) return true;
+  }
+  return false;
 }
 
 function MediaRow({
@@ -250,19 +272,43 @@ function FilterBar({
   typeFilter,
   sourceFilter,
   activeFilter,
+  query,
   onTypeFilterChange,
   onSourceFilterChange,
   onActiveFilterChange,
+  onQueryChange,
 }: {
   typeFilter: string;
   sourceFilter: string;
   activeFilter: string;
+  query: string;
   onTypeFilterChange: (value: string) => void;
   onSourceFilterChange: (value: string) => void;
   onActiveFilterChange: (value: 'all' | 'active' | 'inactive') => void;
+  onQueryChange: (value: string) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 bg-bg-0 p-3">
+      <label className="flex min-w-[16rem] flex-1 items-center gap-2 rounded-[6px] bg-bg-2 px-2.5 py-1.5 focus-within:[box-shadow:inset_0_0_0_2px_var(--accent-live)]">
+        <Search className="size-3.5 text-fg-3" />
+        <input
+          aria-label="Search media"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Search by title, tag, source, series, director…"
+          className="min-w-0 flex-1 bg-transparent text-[12px] text-fg-1 outline-none placeholder:text-fg-3"
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => onQueryChange('')}
+            className="font-mono text-[10px] text-fg-3 hover:text-fg-1"
+          >
+            ✕
+          </button>
+        )}
+      </label>
       <div className="flex items-center gap-2 text-fg-3">
         <Filter className="size-4" />
         <span className="font-mono text-[10px] uppercase tracking-label">Filters</span>
