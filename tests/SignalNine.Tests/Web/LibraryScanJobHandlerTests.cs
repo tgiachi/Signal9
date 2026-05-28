@@ -271,6 +271,45 @@ public class LibraryScanJobHandlerTests
     }
 
     [Fact]
+    public async Task Scan_NewItems_EnqueuesMediaPipelineJobs()
+    {
+        var (handler, _, libraries, jellyfin, _, jobs) = Build();
+        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
+        libraries.Add(lib);
+        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
+        {
+            new("jf-1", "Die Hard", "Movie", 7320L * 10_000_000, 1988, null, null, null, null),
+            new("jf-2", "Aliens", "Movie", 8400L * 10_000_000, 1986, null, null, null, null)
+        };
+
+        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
+
+        Assert.Equal(2, jobs.Enqueued.Count);
+        Assert.All(jobs.Enqueued, j => Assert.Equal("media.pipeline", j.Type));
+    }
+
+    [Fact]
+    public async Task Scan_ExistingItems_DoNotEnqueuePipeline()
+    {
+        var (handler, _, libraries, jellyfin, _, jobs) = Build();
+        var lib = NewJellyfinLibrary(ChannelMediaType.Movies);
+        libraries.Add(lib);
+        jellyfin.Items["jf-lib-1"] = new List<JellyfinItem>
+        {
+            new("jf-1", "Die Hard", "Movie", 7320L * 10_000_000, 1988, null, null, null, null)
+        };
+
+        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
+        Assert.Single(jobs.Enqueued);
+
+        // Re-scan: the same item already exists, so no new pipeline job.
+        jobs.Enqueued.Clear();
+        await handler.ExecuteAsync(NewContext(lib.Id), CancellationToken.None);
+
+        Assert.Empty(jobs.Enqueued);
+    }
+
+    [Fact]
     public async Task Cancellation_AbortsScan()
     {
         var (handler, _, libraries, jellyfin, _, _) = Build();
@@ -391,9 +430,17 @@ public class LibraryScanJobHandlerTests
 
     private sealed class StubJobManager : IJobManager
     {
+        public List<EnqueueJobCommand> Enqueued { get; } = new();
+
         public Task<JobSnapshot> EnqueueAsync(EnqueueJobCommand command, CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            Enqueued.Add(command);
+            return Task.FromResult(new JobSnapshot
+            {
+                Id = Guid.NewGuid(),
+                Type = command.Type,
+                PayloadJson = command.PayloadJson
+            });
         }
         public IReadOnlyList<JobSnapshot> List()
         {

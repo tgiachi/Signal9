@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Pipeline;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
@@ -88,6 +89,9 @@ public class LibraryScanJobHandler : IJobHandler
         libraries.Update(library);
     }
 
+    // Kept as a literal to avoid coupling this handler to MediaPipelineJobHandler.
+    private const string PipelineJobType = "media.pipeline";
+
     private static void TryUpsertJellyfinItem(
         IDataAccess<ChannelMediaEntity> media,
         IJobManager jobs,
@@ -101,7 +105,8 @@ public class LibraryScanJobHandler : IJobHandler
             var existing = FindExisting(media, library.Id, MediaSourceType.Jellyfin, item.Id);
             if (existing is null)
             {
-                media.Insert(BuildChannelMediaFromJellyfin(library, item));
+                var inserted = media.Insert(BuildChannelMediaFromJellyfin(library, item));
+                EnqueuePipelineForNew(jobs, inserted.Id);
             }
             else
             {
@@ -129,7 +134,8 @@ public class LibraryScanJobHandler : IJobHandler
             var existing = FindExisting(media, library.Id, MediaSourceType.LocalFile, item.RelativePath);
             if (existing is null)
             {
-                media.Insert(BuildChannelMediaFromLocal(library, item));
+                var inserted = media.Insert(BuildChannelMediaFromLocal(library, item));
+                EnqueuePipelineForNew(jobs, inserted.Id);
             }
             else
             {
@@ -142,6 +148,14 @@ public class LibraryScanJobHandler : IJobHandler
             _ = jobs.WriteLogAsync(context.JobId, JobLogLevelType.Warning,
                 $"Failed to upsert local file {item.RelativePath}: {ex.Message}", CancellationToken.None);
         }
+    }
+
+    private static void EnqueuePipelineForNew(IJobManager jobs, Guid channelMediaId)
+    {
+        var payload = JsonSerializer.Serialize(new MediaPipelinePayload(channelMediaId));
+        _ = jobs.EnqueueAsync(
+            new EnqueueJobCommand { Type = PipelineJobType, PayloadJson = payload },
+            CancellationToken.None);
     }
 
     private static ChannelMediaEntity? FindExisting(
