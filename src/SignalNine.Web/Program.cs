@@ -113,12 +113,15 @@ builder.Services.AddSingleton<SignalNine.Core.Interfaces.IAssetStore>(_ =>
     new SignalNine.Core.Services.FileSystemAssetStore(assetsRoot));
 builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobResultProcessor,
     SignalNine.Core.Services.LegacyShimResultProcessor>();
+builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobResultProcessor,
+    SignalNine.Web.Services.Results.MediaPipelineResultProcessor>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
 builder.Services.AddSingleton(freeSql);
 builder.Services.AddScoped(typeof(IDataAccess<>), typeof(FreeSqlDataAccess<>));
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
 builder.Services.AddScoped<DefaultUserSeeder>();
+builder.Services.AddSingleton<WorkSpaceStager>();
 // Two worker loops: internal-only (library.scan) and workers-target (media.pipeline).
 // Use Add(ServiceDescriptor.Singleton) directly to bypass TryAddEnumerable deduplication,
 // which would silently drop the second registration when both use the same implementation type.
