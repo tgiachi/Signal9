@@ -67,6 +67,8 @@ builder.Services.AddSingleton<ProbeMediaTask>();
 builder.Services.AddSingleton<ExtractPreviewsTask>();
 builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 
+builder.Services.AddSingleton<WorkerRuntimeState>();
+builder.Services.AddHostedService<WorkerHeartbeatService>();
 builder.Services.AddHostedService<WorkerJobLoop>();
 
 var host = builder.Build();

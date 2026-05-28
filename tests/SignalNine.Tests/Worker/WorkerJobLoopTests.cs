@@ -24,7 +24,8 @@ public class WorkerJobLoopTests
     {
         var identity = new WorkerIdentity(Guid.NewGuid(), "test");
         var config = new SignalNineConfig { JobSystem = new() { MaxConcurrentJobs = concurrency } };
-        return new WorkerJobLoop(config, handlers, queue, bus, identity);
+        var state = new WorkerRuntimeState(config);
+        return new WorkerJobLoop(config, handlers, queue, bus, identity, state);
     }
 
     [Fact]

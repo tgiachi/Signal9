@@ -54,7 +54,8 @@ public class EndToEndWorkerTests : IAsyncLifetime
         var handler = new EchoHandler();
         var identity = new WorkerIdentity(Guid.NewGuid(), "e2e-worker");
         var config = new SignalNineConfig { JobSystem = new() { MaxConcurrentJobs = 1 } };
-        var loop = new WorkerJobLoop(config, new[] { handler }, _queue, _bus, identity);
+        var state = new WorkerRuntimeState(config);
+        var loop = new WorkerJobLoop(config, new[] { handler }, _queue, _bus, identity, state);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
         var resultTcs = new TaskCompletionSource<JobResultEvent>();

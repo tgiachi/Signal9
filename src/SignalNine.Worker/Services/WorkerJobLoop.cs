@@ -16,25 +16,29 @@ public sealed class WorkerJobLoop : BackgroundService
     private readonly IJobQueue _queue;
     private readonly IJobBus _bus;
     private readonly WorkerIdentity _identity;
+    private readonly WorkerRuntimeState _state;
 
     public WorkerJobLoop(
         SignalNineConfig config,
         IEnumerable<IJobHandler> handlers,
         IJobQueue queue,
         IJobBus bus,
-        WorkerIdentity identity)
+        WorkerIdentity identity,
+        WorkerRuntimeState state)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(handlers);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(bus);
         ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(state);
 
         _concurrency = new SemaphoreSlim(Math.Max(MinimumConcurrentJobs, config.JobSystem.MaxConcurrentJobs));
         _handlers = handlers.ToDictionary(h => h.Type, StringComparer.OrdinalIgnoreCase);
         _queue = queue;
         _bus = bus;
         _identity = identity;
+        _state = state;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -79,6 +83,7 @@ public sealed class WorkerJobLoop : BackgroundService
             return;
         }
 
+        _state.MarkStarted(env.JobId);
         try
         {
             var result = await handler.ExecuteAsync(context, stoppingToken).ConfigureAwait(false);
@@ -95,6 +100,7 @@ public sealed class WorkerJobLoop : BackgroundService
         }
         finally
         {
+            _state.MarkFinished(env.JobId);
             await _queue.AckAsync(queued.StreamId, JobStreamTarget.Workers, stoppingToken).ConfigureAwait(false);
         }
     }
