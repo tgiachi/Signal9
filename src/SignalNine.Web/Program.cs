@@ -111,6 +111,7 @@ builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWo
     sp.GetServices<IJobHandler>(),
     sp.GetRequiredService<IJobManager>(),
     SignalNine.Core.Data.Jobs.JobStreamTarget.Workers)));
+builder.Services.AddHostedService<JobBusToManagerAdapter>();
 builder.Services.AddHostedService<LogsBroadcastService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
        .AddJwtBearer(
