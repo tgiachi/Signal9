@@ -301,6 +301,7 @@ app.MapChannelEndpoints();
 app.MapChannelMediaEndpoints();
 app.MapTagEndpoints();
 app.MapJobEndpoints();
+app.MapWorkerEndpoints();
 app.MapHub<JobStatusHub>("/hubs/jobs/status")
    .RequireAuthorization();
 app.MapHub<JobLogHub>("/hubs/jobs/logs")
