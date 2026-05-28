@@ -13,6 +13,7 @@ public class InMemoryJobManager : IJobManager
 
     private readonly IJobQueue _jobQueue;
     private readonly JobTypeRouter _router;
+    private readonly IJobBus _bus;
     private readonly ConcurrentDictionary<Guid, QueuedJob> _inFlight = new();
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancellationTokens = new();
     private readonly ConcurrentDictionary<Guid, object> _jobLocks = new();
@@ -26,18 +27,21 @@ public class InMemoryJobManager : IJobManager
         SignalNineConfig config,
         IJobNotificationPublisher notificationPublisher,
         IJobQueue jobQueue,
-        JobTypeRouter router
+        JobTypeRouter router,
+        IJobBus bus
     )
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(notificationPublisher);
         ArgumentNullException.ThrowIfNull(jobQueue);
         ArgumentNullException.ThrowIfNull(router);
+        ArgumentNullException.ThrowIfNull(bus);
 
         _maxLogEntriesPerJob = Math.Max(MinimumLogEntriesPerJob, config.JobSystem.MaxLogEntriesPerJob);
         _notificationPublisher = notificationPublisher;
         _jobQueue = jobQueue;
         _router = router;
+        _bus = bus;
     }
 
     public async Task<JobSnapshot> EnqueueAsync(
@@ -176,7 +180,10 @@ public class InMemoryJobManager : IJobManager
 
         await _notificationPublisher.PublishStatusAsync(clonedSnapshot, cancellationToken).ConfigureAwait(false);
 
-        return new JobExecutionContext(jobId, clonedSnapshot.PayloadJson, this);
+        // TODO(T16-T18): replace temp path with WorkSpaceConfig.Path once wiring is complete
+        var workDir = Path.Combine(Path.GetTempPath(), $"signalnine-job-{jobId:N}");
+        Directory.CreateDirectory(workDir);
+        return new JobExecutionContext(jobId, clonedSnapshot.PayloadJson, workDir, _bus);
     }
 
     public Task CompleteAsync(Guid jobId, CancellationToken cancellationToken = default)

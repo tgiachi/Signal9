@@ -1,3 +1,4 @@
+using System.Text.Json;
 using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Interfaces;
@@ -12,22 +13,26 @@ public class JobWorkerService : BackgroundService
     private readonly SemaphoreSlim _concurrency;
     private readonly Dictionary<string, IJobHandler> _handlers;
     private readonly IJobManager _jobManager;
+    private readonly IJobBus _bus;
     private readonly JobStreamTarget _target;
 
     public JobWorkerService(
         SignalNineConfig config,
         IEnumerable<IJobHandler> handlers,
         IJobManager jobManager,
+        IJobBus bus,
         JobStreamTarget target
     )
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(handlers);
         ArgumentNullException.ThrowIfNull(jobManager);
+        ArgumentNullException.ThrowIfNull(bus);
 
         _concurrency = new SemaphoreSlim(Math.Max(MinimumConcurrentJobs, config.JobSystem.MaxConcurrentJobs));
         _handlers = handlers.ToDictionary(handler => handler.Type, StringComparer.OrdinalIgnoreCase);
         _jobManager = jobManager;
+        _bus = bus;
         _target = target;
     }
 
@@ -71,7 +76,11 @@ public class JobWorkerService : BackgroundService
 
         try
         {
-            await handler.ExecuteAsync(context, linkedSource.Token).ConfigureAwait(false);
+            var result = await handler.ExecuteAsync(context, linkedSource.Token).ConfigureAwait(false);
+            var resultJson = JsonSerializer.Serialize(result, result.GetType());
+            await _bus.PublishResultAsync(new JobResultEvent(
+                jobId, JobTerminalState.Completed, null, resultJson, DateTimeOffset.UtcNow
+            )).ConfigureAwait(false);
             await _jobManager.CompleteAsync(jobId, stoppingToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)

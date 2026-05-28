@@ -126,6 +126,7 @@ builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWo
     sp.GetRequiredService<SignalNineConfig>(),
     sp.GetServices<IJobHandler>(),
     sp.GetRequiredService<IJobManager>(),
+    sp.GetRequiredService<SignalNine.Core.Interfaces.IJobBus>(),
     SignalNine.Core.Data.Jobs.JobStreamTarget.Internal)));
 if (signalNineConfig.JobSystem.RunInProcessWorker)
 {
@@ -133,6 +134,7 @@ if (signalNineConfig.JobSystem.RunInProcessWorker)
         sp.GetRequiredService<SignalNineConfig>(),
         sp.GetServices<IJobHandler>(),
         sp.GetRequiredService<IJobManager>(),
+        sp.GetRequiredService<SignalNine.Core.Interfaces.IJobBus>(),
         SignalNine.Core.Data.Jobs.JobStreamTarget.Workers)));
 }
 builder.Services.AddHostedService<JobBusToManagerAdapter>();
