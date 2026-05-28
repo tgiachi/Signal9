@@ -36,14 +36,14 @@ public class AuthenticationEndpointTests : IDisposable
     [Fact]
     public async Task Post_Login_ValidCredentials_ReturnsToken()
     {
-        var user = SeedUser("admin", "admin@signalnine.local", "correct-password", UserRoleType.Admin);
+        var user = SeedUser("test-admin", "test-admin@signalnine.local", "correct-password", UserRoleType.Admin);
         using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/login",
             new
             {
-                Username = "admin",
+                Username = "test-admin",
                 Password = "correct-password"
             }
         );
