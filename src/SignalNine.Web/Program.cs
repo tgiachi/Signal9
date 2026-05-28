@@ -84,8 +84,28 @@ builder.Services.AddSingleton<ConfigSchemaService>();
 builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<JobTypeRouter>();
-builder.Services.AddSingleton<IJobQueue, InMemoryJobQueue>();
-builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobBus, SignalNine.Core.Services.InMemoryJobBus>();
+// Job queue + bus: Redis if Redis.Url set, in-memory otherwise.
+if (!string.IsNullOrWhiteSpace(signalNineConfig.Redis.Url))
+{
+    var redisConfig = StackExchange.Redis.ConfigurationOptions.Parse(signalNineConfig.Redis.Url);
+    redisConfig.AbortOnConnectFail = false;
+    redisConfig.DefaultDatabase = signalNineConfig.Redis.Database;
+    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(
+        _ => StackExchange.Redis.ConnectionMultiplexer.Connect(redisConfig));
+    builder.Services.AddSingleton<SignalNine.Core.Services.Redis.RedisStreamKeys>(
+        sp => new SignalNine.Core.Services.Redis.RedisStreamKeys(signalNineConfig.Redis));
+    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobQueue,
+        SignalNine.Core.Services.Redis.RedisJobQueue>();
+    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobBus,
+        SignalNine.Core.Services.Redis.RedisJobBus>();
+}
+else
+{
+    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobQueue,
+        SignalNine.Core.Services.InMemoryJobQueue>();
+    builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobBus,
+        SignalNine.Core.Services.InMemoryJobBus>();
+}
 builder.Services.AddSingleton<SignalNine.Core.Interfaces.IWorkerRegistry, SignalNine.Core.Services.InMemoryWorkerRegistry>();
 var assetsRoot = directoriesConfig[DirectoryType.Assets];
 builder.Services.AddSingleton<SignalNine.Core.Interfaces.IAssetStore>(_ =>
@@ -146,8 +166,12 @@ builder.Services.Configure<FormOptions>(
         options.MultipartBodyLengthLimit = ChannelLogoUploadMultipartBodyLengthLimit;
     }
 );
-builder.Services.AddHealthChecks()
+var healthChecks = builder.Services.AddHealthChecks()
        .AddCheck<FreeSqlHealthCheck>("database");
+if (!string.IsNullOrWhiteSpace(signalNineConfig.Redis.Url))
+{
+    healthChecks.AddCheck<SignalNine.Web.Services.RedisHealthCheck>("redis");
+}
 
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
