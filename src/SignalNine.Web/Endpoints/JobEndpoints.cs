@@ -53,9 +53,13 @@ public static class JobEndpoints
         return app;
     }
 
-    private static Results<Ok<IReadOnlyList<JobResponse>>, NotFound> ListJobs(IJobManager manager)
+    private static Results<Ok<IReadOnlyList<JobResponse>>, NotFound> ListJobs(
+        IJobManager manager,
+        int? limit
+    )
     {
-        var jobs = manager.List().Select(ToResponse).ToList();
+        var cap = limit is null || limit.Value <= 0 ? 200 : Math.Min(limit.Value, 1000);
+        var jobs = manager.List().Take(cap).Select(ToResponse).ToList();
 
         return TypedResults.Ok<IReadOnlyList<JobResponse>>(jobs);
     }
