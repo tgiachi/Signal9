@@ -3,8 +3,9 @@ using SignalNine.Core.Data.Ffmpeg;
 using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
-using SignalNine.Web.Data.Pipeline;
-using SignalNine.Web.Interfaces;
+using SignalNine.Persistence.Types;
+using SignalNine.Jobs.Data.Pipeline;
+using SignalNine.Jobs.Interfaces;
 
 namespace SignalNine.Web.Services.Pipeline;
 
@@ -12,6 +13,7 @@ public class ExtractPreviewsTask : IPipelineTask
 {
     private const string PreviewsRootName = "previews";
     private const string ThumbnailPattern = "thumb-%03d.jpg";
+    private const string ExistingThumbnailPattern = "thumb-*.jpg";
     private const string FfmpegExecutable = "ffmpeg";
 
     private readonly IFfmpegPool _pool;
@@ -40,6 +42,22 @@ public class ExtractPreviewsTask : IPipelineTask
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        var outputDir = Path.Combine(
+            _directories[DirectoryType.Assets],
+            PreviewsRootName,
+            context.Media.Id.ToString()
+        );
+        if (!_config.Tasks.Preview.OverwriteExisting && HasExistingPreview(outputDir))
+        {
+            return;
+        }
+
+        if (context.Media.SourceType == MediaSourceType.Jellyfin &&
+            !_config.Tasks.Preview.AllowJellyfinStreamFallback)
+        {
+            return;
+        }
+
         var durationSeconds = context.Media.DurationSeconds;
         if (durationSeconds is null)
         {
@@ -50,12 +68,6 @@ public class ExtractPreviewsTask : IPipelineTask
             }
             durationSeconds = (int)probe.Duration.Value.TotalSeconds;
         }
-
-        var outputDir = Path.Combine(
-            _directories[DirectoryType.Assets],
-            PreviewsRootName,
-            context.Media.Id.ToString()
-        );
 
         if (Directory.Exists(outputDir))
         {
@@ -68,7 +80,7 @@ public class ExtractPreviewsTask : IPipelineTask
             FfmpegExecutable,
             context.ResolvedPath,
             outputPattern,
-            _config.PreviewCount,
+            _config.Tasks.Preview.PreviewCount,
             TimeSpan.FromSeconds(durationSeconds.Value)
         );
 
@@ -83,5 +95,15 @@ public class ExtractPreviewsTask : IPipelineTask
                 string.Join('\n', snapshot.RecentOutputLines)
             );
         }
+    }
+
+    private static bool HasExistingPreview(string outputDir)
+    {
+        if (!Directory.Exists(outputDir))
+        {
+            return false;
+        }
+
+        return Directory.EnumerateFiles(outputDir, ExistingThumbnailPattern).Any();
     }
 }

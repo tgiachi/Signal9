@@ -15,7 +15,7 @@ using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Services;
 using SignalNine.Web.Endpoints;
 using SignalNine.Web.Hubs;
-using SignalNine.Web.Interfaces;
+using SignalNine.Jobs.Interfaces;
 using SignalNine.Web.Services;
 using SignalNine.Web.Services.Config;
 using SignalNine.Web.Services.Pipeline;

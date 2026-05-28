@@ -2,8 +2,9 @@ using SignalNine.Core.Data.Config;
 using SignalNine.Core.Interfaces;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
-using SignalNine.Web.Data.Pipeline;
-using SignalNine.Web.Interfaces;
+using SignalNine.Persistence.Types;
+using SignalNine.Jobs.Data.Pipeline;
+using SignalNine.Jobs.Interfaces;
 
 namespace SignalNine.Web.Services.Pipeline;
 
@@ -35,7 +36,13 @@ public class ProbeMediaTask : IPipelineTask
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (context.Media.DurationSeconds is not null && !_config.OverwriteExistingProbe)
+        if (context.Media.DurationSeconds is not null && !_config.Tasks.Probe.OverwriteExisting)
+        {
+            return;
+        }
+
+        if (context.Media.SourceType == MediaSourceType.Jellyfin &&
+            !_config.Tasks.Probe.AllowJellyfinStreamProbe)
         {
             return;
         }

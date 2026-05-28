@@ -1,6 +1,6 @@
-using SignalNine.Web.Data.Pipeline;
+using SignalNine.Jobs.Data.Pipeline;
 
-namespace SignalNine.Web.Interfaces;
+namespace SignalNine.Jobs.Interfaces;
 
 public interface IPipelineTask
 {

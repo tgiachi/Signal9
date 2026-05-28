@@ -1,6 +1,6 @@
 using SignalNine.Persistence.Entities.Channels;
 
-namespace SignalNine.Web.Interfaces;
+namespace SignalNine.Jobs.Interfaces;
 
 public interface IMediaPathResolver
 {

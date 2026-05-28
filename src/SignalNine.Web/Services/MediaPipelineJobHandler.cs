@@ -6,8 +6,8 @@ using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
-using SignalNine.Web.Data.Pipeline;
-using SignalNine.Web.Interfaces;
+using SignalNine.Jobs.Data.Pipeline;
+using SignalNine.Jobs.Interfaces;
 
 namespace SignalNine.Web.Services;
 

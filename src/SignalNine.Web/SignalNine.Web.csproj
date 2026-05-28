@@ -27,6 +27,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\SignalNine.Core\SignalNine.Core.csproj" />
+      <ProjectReference Include="..\SignalNine.Jobs\SignalNine.Jobs.csproj" />
       <ProjectReference Include="..\SignalNine.Persistence\SignalNine.Persistence.csproj" />
     </ItemGroup>
 
