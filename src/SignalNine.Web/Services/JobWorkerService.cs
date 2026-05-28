@@ -1,4 +1,5 @@
 using SignalNine.Core.Data.Config;
+using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
 
@@ -11,11 +12,13 @@ public class JobWorkerService : BackgroundService
     private readonly SemaphoreSlim _concurrency;
     private readonly Dictionary<string, IJobHandler> _handlers;
     private readonly IJobManager _jobManager;
+    private readonly JobStreamTarget _target;
 
     public JobWorkerService(
         SignalNineConfig config,
         IEnumerable<IJobHandler> handlers,
-        IJobManager jobManager
+        IJobManager jobManager,
+        JobStreamTarget target
     )
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -25,6 +28,7 @@ public class JobWorkerService : BackgroundService
         _concurrency = new SemaphoreSlim(Math.Max(MinimumConcurrentJobs, config.JobSystem.MaxConcurrentJobs));
         _handlers = handlers.ToDictionary(handler => handler.Type, StringComparer.OrdinalIgnoreCase);
         _jobManager = jobManager;
+        _target = target;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -33,64 +37,37 @@ public class JobWorkerService : BackgroundService
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                var jobId = await _jobManager.DequeueAsync(stoppingToken).ConfigureAwait(false);
+                var jobId = await _jobManager.DequeueAsync(_target, stoppingToken).ConfigureAwait(false);
                 await _concurrency.WaitAsync(stoppingToken).ConfigureAwait(false);
 
-                _ = Task.Run(
-                    async () =>
-                    {
-                        try
-                        {
-                            await ExecuteJobAsync(jobId, stoppingToken).ConfigureAwait(false);
-                        }
-                        finally
-                        {
-                            _concurrency.Release();
-                        }
-                    },
-                    CancellationToken.None
-                );
+                _ = Task.Run(async () =>
+                {
+                    try { await ExecuteJobAsync(jobId, stoppingToken).ConfigureAwait(false); }
+                    finally { _concurrency.Release(); }
+                }, CancellationToken.None);
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
 
     private async Task ExecuteJobAsync(Guid jobId, CancellationToken stoppingToken)
     {
         var context = await _jobManager.StartAsync(jobId, stoppingToken).ConfigureAwait(false);
-
-        if (context is null)
-        {
-            return;
-        }
+        if (context is null) return;
 
         var snapshot = _jobManager.GetById(jobId);
-
         if (snapshot is null || !_handlers.TryGetValue(snapshot.Type, out var handler))
         {
-            await _jobManager.WriteLogAsync(
-                    jobId,
-                    JobLogLevelType.Error,
-                    "No handler registered for job type.",
-                    stoppingToken
-                )
-                .ConfigureAwait(false);
-            await _jobManager.FailAsync(
-                    jobId,
-                    new InvalidOperationException("No handler registered for job type."),
-                    stoppingToken
-                )
-                .ConfigureAwait(false);
-
+            await _jobManager.WriteLogAsync(jobId, JobLogLevelType.Error,
+                "No handler registered for job type.", stoppingToken).ConfigureAwait(false);
+            await _jobManager.FailAsync(jobId,
+                new InvalidOperationException("No handler registered for job type."),
+                stoppingToken).ConfigureAwait(false);
             return;
         }
 
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
-            stoppingToken,
-            _jobManager.GetCancellationToken(jobId)
-        );
+            stoppingToken, _jobManager.GetCancellationToken(jobId));
 
         try
         {

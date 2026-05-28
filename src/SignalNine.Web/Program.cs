@@ -85,13 +85,32 @@ builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<JobTypeRouter>();
 builder.Services.AddSingleton<IJobQueue, InMemoryJobQueue>();
+builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobBus, SignalNine.Core.Services.InMemoryJobBus>();
+builder.Services.AddSingleton<SignalNine.Core.Interfaces.IWorkerRegistry, SignalNine.Core.Services.InMemoryWorkerRegistry>();
+var assetsRoot = directoriesConfig[DirectoryType.Assets];
+builder.Services.AddSingleton<SignalNine.Core.Interfaces.IAssetStore>(_ =>
+    new SignalNine.Core.Services.FileSystemAssetStore(assetsRoot));
+builder.Services.AddSingleton<SignalNine.Core.Interfaces.IJobResultProcessor,
+    SignalNine.Core.Services.LegacyShimResultProcessor>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
 builder.Services.AddSingleton(freeSql);
 builder.Services.AddScoped(typeof(IDataAccess<>), typeof(FreeSqlDataAccess<>));
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
 builder.Services.AddScoped<DefaultUserSeeder>();
-builder.Services.AddHostedService<JobWorkerService>();
+// Two worker loops: internal-only (library.scan) and workers-target (media.pipeline).
+// Use Add(ServiceDescriptor.Singleton) directly to bypass TryAddEnumerable deduplication,
+// which would silently drop the second registration when both use the same implementation type.
+builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWorkerService(
+    sp.GetRequiredService<SignalNineConfig>(),
+    sp.GetServices<IJobHandler>(),
+    sp.GetRequiredService<IJobManager>(),
+    SignalNine.Core.Data.Jobs.JobStreamTarget.Internal)));
+builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWorkerService(
+    sp.GetRequiredService<SignalNineConfig>(),
+    sp.GetServices<IJobHandler>(),
+    sp.GetRequiredService<IJobManager>(),
+    SignalNine.Core.Data.Jobs.JobStreamTarget.Workers)));
 builder.Services.AddHostedService<LogsBroadcastService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
        .AddJwtBearer(
