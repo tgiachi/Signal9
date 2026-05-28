@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
@@ -5,23 +6,26 @@ using SignalNine.Core.Types;
 namespace SignalNine.Web.Services;
 
 /// <summary>
-/// Phase 1 wiring. Subscribes to <see cref="IJobBus"/> events and forwards them to
-/// <see cref="IJobManager"/>. In Phase 1 the handlers still mutate state directly, so
-/// the bus is idle and this service does nothing visible. Phase 4 wires real progress/
-/// log/result publishing from handlers, and this adapter becomes the single ingestion
-/// point on the web side.
+/// Subscribes to <see cref="IJobBus"/> events and forwards them to <see cref="IJobManager"/>.
+/// On completion, dispatches the result to the matching <see cref="IJobResultProcessor"/> by JobType.
 /// </summary>
 public sealed class JobBusToManagerAdapter : BackgroundService
 {
     private readonly IJobBus _bus;
     private readonly IJobManager _jobManager;
     private readonly IEnumerable<IJobResultProcessor> _processors;
+    private readonly ILogger<JobBusToManagerAdapter> _logger;
 
-    public JobBusToManagerAdapter(IJobBus bus, IJobManager jobManager, IEnumerable<IJobResultProcessor> processors)
+    public JobBusToManagerAdapter(
+        IJobBus bus,
+        IJobManager jobManager,
+        IEnumerable<IJobResultProcessor> processors,
+        ILogger<JobBusToManagerAdapter> logger)
     {
         _bus = bus;
         _jobManager = jobManager;
         _processors = processors;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,14 +56,33 @@ public sealed class JobBusToManagerAdapter : BackgroundService
     {
         await foreach (var e in _bus.SubscribeResultAsync(ct).ConfigureAwait(false))
         {
-            // Phase 4 will dispatch to per-type processors. For now route to the legacy shim.
-            var processor = _processors.FirstOrDefault(p => p.JobType == "*");
-            if (processor is not null)
-                await processor.ApplyAsync(e.JobId, e.ResultJson, ct).ConfigureAwait(false);
-
             switch (e.State)
             {
                 case JobTerminalState.Completed:
+                    var jobType = _jobManager.GetById(e.JobId)?.Type;
+                    if (jobType is null)
+                    {
+                        _logger.LogWarning(
+                            "Received Completed result for unknown job {JobId} — no type resolved, skipping processor.",
+                            e.JobId);
+                    }
+                    else
+                    {
+                        var processor = _processors.FirstOrDefault(p => p.JobType == jobType);
+                        if (processor is not null)
+                        {
+                            try
+                            {
+                                await processor.ApplyAsync(e.JobId, e.ResultJson, ct).ConfigureAwait(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex,
+                                    "Result processor {ProcessorType} threw for job {JobId} (type={JobType}).",
+                                    processor.GetType().Name, e.JobId, jobType);
+                            }
+                        }
+                    }
                     await _jobManager.CompleteAsync(e.JobId, ct).ConfigureAwait(false);
                     break;
                 case JobTerminalState.Failed:
@@ -69,7 +92,7 @@ public sealed class JobBusToManagerAdapter : BackgroundService
                     await _jobManager.MarkCanceledAsync(e.JobId, ct).ConfigureAwait(false);
                     break;
                 case JobTerminalState.Retry:
-                    // Phase 6 handles this. Phase 1 just logs.
+                    // Phase 6 handles retry. Phase 1 just logs.
                     await _jobManager.WriteLogAsync(e.JobId, JobLogLevelType.Warning,
                         $"Retry requested: {e.Error}", ct).ConfigureAwait(false);
                     break;
