@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Film, Filter, Play, RefreshCw, Search, ShieldAlert } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Film,
+  Filter,
+  Play,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import {
@@ -31,6 +40,8 @@ export function ChannelMediaPage() {
   const [sourceFilter, setSourceFilter] = useState<'all' | string>('all');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [query, setQuery] = useState('');
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [page, setPage] = useState<number>(0);
   const [playing, setPlaying] = useState<ChannelMediaResponse | null>(null);
 
   const filtered = useMemo(() => {
@@ -44,6 +55,15 @@ export function ChannelMediaPage() {
       return mediaMatchesQuery(media, needle);
     });
   }, [activeFilter, channelMedia.media, query, sourceFilter, typeFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  // Clamp at render time — when filters shrink the result set below the current page, we
+  // display the valid last page without needing a useEffect to mutate state.
+  const clampedPage = Math.min(page, pageCount - 1);
+  const paged = useMemo(
+    () => filtered.slice(clampedPage * pageSize, (clampedPage + 1) * pageSize),
+    [filtered, clampedPage, pageSize],
+  );
 
   const runPipeline = async (media: ChannelMediaResponse) => {
     try {
@@ -124,7 +144,7 @@ export function ChannelMediaPage() {
           ) : filtered.length === 0 ? (
             <EmptyState text="No channel media match this view." />
           ) : (
-            filtered.map((media, idx) => (
+            paged.map((media, idx) => (
               <MediaRow
                 key={media.id}
                 media={media}
@@ -136,8 +156,81 @@ export function ChannelMediaPage() {
             ))
           )}
         </div>
+        <PaginationBar
+          page={clampedPage}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          total={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(0);
+          }}
+        />
       </section>
       <MediaPlayerDialog media={playing} onOpenChange={(open) => !open && setPlaying(null)} />
+    </div>
+  );
+}
+
+function PaginationBar({
+  page,
+  pageCount,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}) {
+  const from = total === 0 ? 0 : page * pageSize + 1;
+  const to = Math.min(total, (page + 1) * pageSize);
+  return (
+    <div className="flex flex-wrap items-center gap-3 bg-bg-4 px-3 py-2 font-mono text-[10px] text-fg-3">
+      <span>
+        {from}–{to} of {total}
+      </span>
+      <span className="ml-auto flex items-center gap-2">
+        <span className="uppercase tracking-label">Page size</span>
+        <select
+          aria-label="Rows per page"
+          value={pageSize}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          className="rounded-[6px] bg-bg-2 px-2 py-1 text-[11px] text-fg-1 outline-none focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
+        >
+          <option value={25}>25</option>
+          <option value={50}>50</option>
+          <option value={100}>100</option>
+        </select>
+      </span>
+      <span className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label="Previous page"
+          disabled={page === 0}
+          onClick={() => onPageChange(page - 1)}
+          className="flex size-7 items-center justify-center rounded-[6px] bg-bg-2 text-fg-1 transition hover:bg-[#343b41] disabled:opacity-30"
+        >
+          <ChevronLeft className="size-3.5" />
+        </button>
+        <span className="min-w-[5rem] text-center uppercase tracking-label">
+          page {page + 1}/{pageCount}
+        </span>
+        <button
+          type="button"
+          aria-label="Next page"
+          disabled={page >= pageCount - 1}
+          onClick={() => onPageChange(page + 1)}
+          className="flex size-7 items-center justify-center rounded-[6px] bg-bg-2 text-fg-1 transition hover:bg-[#343b41] disabled:opacity-30"
+        >
+          <ChevronRight className="size-3.5" />
+        </button>
+      </span>
     </div>
   );
 }
