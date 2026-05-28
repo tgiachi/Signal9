@@ -21,6 +21,7 @@ public class InMemoryJobManager : IJobManager
     private readonly ConcurrentDictionary<Guid, List<JobLogEntry>> _logs = new();
     private readonly int _maxLogEntriesPerJob;
     private readonly IJobNotificationPublisher _notificationPublisher;
+    private readonly string _workSpacePath;
     private long _logSequence;
 
     public InMemoryJobManager(
@@ -42,6 +43,7 @@ public class InMemoryJobManager : IJobManager
         _jobQueue = jobQueue;
         _router = router;
         _bus = bus;
+        _workSpacePath = config.WorkSpace.Path;
     }
 
     public async Task<JobSnapshot> EnqueueAsync(
@@ -77,7 +79,7 @@ public class InMemoryJobManager : IJobManager
             JobId: snapshot.Id,
             Type: snapshot.Type,
             PayloadJson: snapshot.PayloadJson,
-            WorkDir: $"/signal9_work/jobs/{snapshot.Id}",
+            WorkDir: Path.Combine(_workSpacePath, "jobs", snapshot.Id.ToString()),
             Attempt: 0,
             EnqueuedAt: now);
         var target = _router.ResolveTarget(snapshot.Type);
@@ -180,8 +182,7 @@ public class InMemoryJobManager : IJobManager
 
         await _notificationPublisher.PublishStatusAsync(clonedSnapshot, cancellationToken).ConfigureAwait(false);
 
-        // TODO(T16-T18): replace temp path with WorkSpaceConfig.Path once wiring is complete
-        var workDir = Path.Combine(Path.GetTempPath(), $"signalnine-job-{jobId:N}");
+        var workDir = Path.Combine(_workSpacePath, "jobs", jobId.ToString());
         Directory.CreateDirectory(workDir);
         return new JobExecutionContext(jobId, clonedSnapshot.PayloadJson, workDir, _bus);
     }

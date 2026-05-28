@@ -44,6 +44,13 @@ var rootDirectory = Environment.GetEnvironmentVariable("SIGNAL9_ROOT_DIRECTORY")
 var directoriesConfig = new DirectoriesConfig(rootDirectory, Enum.GetNames<DirectoryType>());
 var configService = new ConfigService(directoriesConfig);
 var signalNineConfig = await configService.LoadAsync();
+
+// Resolve {ROOT_DIRECTORY} token in path-shaped config values.
+signalNineConfig.WorkSpace.Path = signalNineConfig.WorkSpace.Path
+    .Replace("{ROOT_DIRECTORY}", rootDirectory, StringComparison.Ordinal);
+signalNineConfig.FinalStorage.Path = signalNineConfig.FinalStorage.Path
+    .Replace("{ROOT_DIRECTORY}", rootDirectory, StringComparison.Ordinal);
+Directory.CreateDirectory(signalNineConfig.WorkSpace.Path);
 var serilogService = new SerilogService(directoriesConfig);
 var freeSqlFactory = new FreeSqlFactory(directoriesConfig);
 var freeSql = freeSqlFactory.Create(signalNineConfig);
