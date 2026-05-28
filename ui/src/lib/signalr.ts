@@ -21,21 +21,18 @@ export function setSignalRAccessTokenProvider(provider: (() => string | null) | 
 }
 
 function createConnection(url: string): HubConnection {
-  const options = createOptions();
-  const builder = new HubConnectionBuilder();
-  const withUrl = options ? builder.withUrl(url, options) : builder.withUrl(url);
-
-  return withUrl
+  return new HubConnectionBuilder()
+    .withUrl(url, createOptions())
     .withAutomaticReconnect([0, 2000, 5000, 10000])
     .configureLogging(SignalRLogLevel.None)
     .build();
 }
 
-function createOptions(): IHttpConnectionOptions | undefined {
-  const token = accessTokenProvider?.();
-  if (!token) return undefined;
-
-  return { accessTokenFactory: () => token };
+function createOptions(): IHttpConnectionOptions {
+  // accessTokenFactory is invoked by SignalR on every handshake / reconnect, so we close over
+  // the *provider* (not a snapshot of the token). This way the latest JWT — including one that
+  // arrived after the hub was created, or a refreshed one — is always used.
+  return { accessTokenFactory: () => accessTokenProvider?.() ?? '' };
 }
 
 export function createLogsConnection(url = '/hubs/logs'): HubConnection {
@@ -48,5 +45,9 @@ export function createJobStatusConnection(url = '/hubs/jobs/status'): HubConnect
 }
 
 export function createJobLogsConnection(url = '/hubs/jobs/logs'): HubConnection {
+  return createConnection(url);
+}
+
+export function createFfmpegConnection(url = '/hubs/ffmpeg'): HubConnection {
   return createConnection(url);
 }
