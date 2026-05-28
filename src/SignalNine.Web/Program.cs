@@ -116,8 +116,6 @@ var assetsRoot = directoriesConfig[DirectoryType.Assets];
 builder.Services.AddSingleton<IAssetStore>(_ =>
                                                new FileSystemAssetStore(assetsRoot));
 builder.Services.AddSingleton<IJobResultProcessor,
-    LegacyShimResultProcessor>();
-builder.Services.AddSingleton<IJobResultProcessor,
     MediaPipelineResultProcessor>();
 builder.Services.AddSingleton<IJobResultProcessor,
     LibraryScanResultProcessor>();

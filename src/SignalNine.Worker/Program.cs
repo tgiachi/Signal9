@@ -9,6 +9,7 @@ using SignalNine.Core.Services;
 using SignalNine.Core.Services.Ffmpeg;
 using SignalNine.Core.Services.Redis;
 using SignalNine.Jobs.Services;
+using SignalNine.Jobs.Services.Pipeline;
 using SignalNine.Worker.Services;
 using StackExchange.Redis;
 
@@ -34,15 +35,17 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
-// Minimal SignalNineConfig — worker only needs JobSystem + FfmpegPool sections
+// Minimal SignalNineConfig — worker needs JobSystem, FfmpegPool, Redis, Pipeline sections
 var signalNineConfig = new SignalNineConfig
 {
     JobSystem = new JobSystemConfig { MaxConcurrentJobs = maxConcurrent },
     FfmpegPool = new FfmpegPoolConfig(),
-    Redis = new RedisConfig { Url = redisUrl }
+    Redis = new RedisConfig { Url = redisUrl },
+    Pipeline = new PipelineConfig()
 };
 builder.Services.AddSingleton(signalNineConfig);
 builder.Services.AddSingleton(signalNineConfig.Redis);
+builder.Services.AddSingleton(signalNineConfig.Pipeline);
 builder.Services.AddSingleton(identity);
 
 // Redis connection
@@ -59,13 +62,9 @@ builder.Services.AddSingleton<IFfmpegPool>(sp => new FfmpegPool(
     sp.GetRequiredService<IProcessLauncher>(),
     signalNineConfig.FfmpegPool));
 
-// Worker-eligible handlers only (library.scan stays on web).
-// NOTE: MediaPipelineJobHandler constructs with IServiceScopeFactory only — it compiles.
-// Pipeline tasks (ProbeMediaTask, ExtractPreviewsTask, TagMediaTask) need IDataAccess<>
-// which requires a DB connection not available in this process.
-// Phase 4 will refactor handlers to accept IJobBus directly and remove the DB dependency here.
-// Until then: the binary compiles and the handler is registered; a job pull will throw at
-// runtime when the handler tries to resolve IDataAccess<ChannelMediaEntity> from the scope.
+// Worker-eligible handlers (library.scan stays on web).
+builder.Services.AddSingleton<ProbeMediaTask>();
+builder.Services.AddSingleton<ExtractPreviewsTask>();
 builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 
 builder.Services.AddHostedService<WorkerJobLoop>();
