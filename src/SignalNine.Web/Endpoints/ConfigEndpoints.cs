@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using SignalNine.Core.Data.Config.Schema;
 using SignalNine.Core.Interfaces;
 using SignalNine.Web.Data.Config;
+using SignalNine.Web.Services.Config;
 
 namespace SignalNine.Web.Endpoints;
 
@@ -26,7 +28,17 @@ public static class ConfigEndpoints
             SaveConfigAsync
         );
 
+        group.MapGet(
+            "/schema",
+            GetSchema
+        );
+
         return app;
+    }
+
+    private static Ok<ConfigSchemaDocument> GetSchema(ConfigSchemaService schemaService)
+    {
+        return TypedResults.Ok(schemaService.CreateSchema());
     }
 
     private static async Task<Results<ContentHttpResult, NotFound>> GetConfigAsync(
