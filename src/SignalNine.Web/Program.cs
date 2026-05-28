@@ -142,6 +142,7 @@ if (signalNineConfig.JobSystem.RunInProcessWorker)
 }
 builder.Services.AddHostedService<JobBusToManagerAdapter>();
 builder.Services.AddHostedService<LogsBroadcastService>();
+builder.Services.AddHostedService<WorkSpaceJanitor>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
        .AddJwtBearer(
            options =>
