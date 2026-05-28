@@ -124,6 +124,109 @@ public class JellyfinService : IJellyfinService
         return all;
     }
 
+    public async Task<IReadOnlyList<JellyfinPreviewImage>> GetPreviewImagesAsync(
+        string itemId,
+        int maxImages,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(itemId);
+        if (maxImages <= 0) return Array.Empty<JellyfinPreviewImage>();
+
+        var infos = await GetAsync<List<ImageInfoDto>>($"Items/{Uri.EscapeDataString(itemId)}/Images", ct)
+            .ConfigureAwait(false);
+        if (infos is null || infos.Count == 0) return Array.Empty<JellyfinPreviewImage>();
+
+        var ordered = infos
+            .Where(i => !string.IsNullOrWhiteSpace(i.ImageType))
+            .OrderBy(i => i.ImageType switch
+            {
+                "Primary" => 0,
+                "Thumb" => 1,
+                "Backdrop" => 2,
+                _ => 3
+            })
+            .ThenBy(i => i.ImageIndex ?? 0)
+            .Take(maxImages)
+            .ToList();
+
+        var results = new List<JellyfinPreviewImage>(ordered.Count);
+        foreach (var info in ordered)
+        {
+            ct.ThrowIfCancellationRequested();
+            var index = info.ImageIndex ?? 0;
+            var path = $"Items/{Uri.EscapeDataString(itemId)}/Images/{info.ImageType}/{index}";
+            var bytes = await DownloadBytesAsync(path, ct).ConfigureAwait(false);
+            if (bytes is null || bytes.Length == 0) continue;
+
+            var sourceName = $"{info.ImageType}-{index}";
+            results.Add(new JellyfinPreviewImage(sourceName, bytes));
+        }
+
+        return results;
+    }
+
+    public async Task<JellyfinItemTags> GetItemTagsAsync(string itemId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(itemId);
+
+        var dto = await GetAsync<ItemDto>(
+            $"Items/{Uri.EscapeDataString(itemId)}?Fields=Tags,Genres",
+            ct,
+            allowNotFound: true
+        ).ConfigureAwait(false);
+        if (dto is null)
+        {
+            return new JellyfinItemTags(Array.Empty<string>(), Array.Empty<string>());
+        }
+
+        return new JellyfinItemTags(
+            (IReadOnlyList<string>?)dto.Genres ?? Array.Empty<string>(),
+            (IReadOnlyList<string>?)dto.Tags ?? Array.Empty<string>()
+        );
+    }
+
+    private async Task<byte[]?> DownloadBytesAsync(string relativePath, CancellationToken ct)
+    {
+        var creds = await ResolveCredentialsAsync(ct).ConfigureAwait(false);
+        var http = _httpClientFactory.CreateClient(HttpClientName);
+
+        var requestUri = new Uri(new Uri(creds.BaseUrl.TrimEnd('/') + "/"), relativePath);
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("MediaBrowser", $"Token=\"{creds.ApiKey}\"");
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new JellyfinUnreachableException(ex.Message);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new JellyfinUnreachableException("Request timed out.", null);
+        }
+
+        using (response)
+        {
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                throw new JellyfinAuthException("Jellyfin rejected the credentials (HTTP 401).");
+            }
+            if (response.StatusCode == HttpStatusCode.NotFound) return null;
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new JellyfinUnreachableException(
+                    $"Jellyfin returned HTTP {(int)response.StatusCode}.",
+                    (int)response.StatusCode
+                );
+            }
+
+            return await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+        }
+    }
+
     private async Task<T?> GetAsync<T>(string relativePath, CancellationToken ct, bool allowNotFound = false)
     {
         var creds = await ResolveCredentialsAsync(ct).ConfigureAwait(false);
@@ -210,5 +313,14 @@ public class JellyfinService : IJellyfinService
         public string? SeriesName { get; set; }
         public int? ParentIndexNumber { get; set; }
         public int? IndexNumber { get; set; }
+        public List<string>? Tags { get; set; }
+        public List<string>? Genres { get; set; }
+    }
+
+    private sealed class ImageInfoDto
+    {
+        public string? ImageType { get; set; }
+        public int? ImageIndex { get; set; }
+        public string? ImageTag { get; set; }
     }
 }

@@ -8,4 +8,6 @@ public interface IJellyfinService
     Task<IReadOnlyList<JellyfinLibrarySummary>> ListLibrariesAsync(CancellationToken ct = default);
     Task<JellyfinItem?> GetItemAsync(string itemId, CancellationToken ct = default);
     Task<IReadOnlyList<JellyfinItem>> ListItemsAsync(string libraryId, CancellationToken ct = default);
+    Task<IReadOnlyList<JellyfinPreviewImage>> GetPreviewImagesAsync(string itemId, int maxImages, CancellationToken ct = default);
+    Task<JellyfinItemTags> GetItemTagsAsync(string itemId, CancellationToken ct = default);
 }
