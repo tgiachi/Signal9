@@ -100,9 +100,14 @@ export function useJobs() {
   };
 }
 
+const MAX_JOBS_IN_CACHE = 200;
+
 function upsertJob(jobs: JobResponse[], job: JobResponse): JobResponse[] {
   const existing = jobs.findIndex((item) => item.id === job.id);
-  if (existing < 0) return [job, ...jobs];
+  if (existing < 0) {
+    const next = [job, ...jobs];
+    return next.length > MAX_JOBS_IN_CACHE ? next.slice(0, MAX_JOBS_IN_CACHE) : next;
+  }
 
   const next = jobs.slice();
   next[existing] = job;

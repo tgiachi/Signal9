@@ -62,3 +62,25 @@ export function sortJobs(jobs: JobResponse[]): JobResponse[] {
     .slice()
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
+
+// Order: running first (most recent at top), then queued (oldest first — FIFO preview),
+// then terminal states (completed/failed/canceled) by createdAt desc.
+const STATE_PRIORITY: Record<string, number> = {
+  running: 0,
+  queued: 1,
+  completed: 2,
+  failed: 2,
+  canceled: 2,
+};
+
+export function sortJobsByPriority(jobs: JobResponse[]): JobResponse[] {
+  return jobs.slice().sort((a, b) => {
+    const pa = STATE_PRIORITY[a.state] ?? 3;
+    const pb = STATE_PRIORITY[b.state] ?? 3;
+    if (pa !== pb) return pa - pb;
+    if (a.state === 'queued' && b.state === 'queued') {
+      return Date.parse(a.createdAt) - Date.parse(b.createdAt);
+    }
+    return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+  });
+}
