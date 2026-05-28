@@ -4,7 +4,7 @@ using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Types;
 using SignalNine.Jobs.Interfaces;
 
-namespace SignalNine.Web.Services.Pipeline;
+namespace SignalNine.Jobs.Services.Pipeline;
 
 public class DefaultMediaPathResolver : IMediaPathResolver
 {

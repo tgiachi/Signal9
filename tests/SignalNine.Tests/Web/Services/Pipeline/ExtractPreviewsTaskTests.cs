@@ -8,7 +8,7 @@ using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Types;
 using SignalNine.Jobs.Data.Pipeline;
-using SignalNine.Web.Services.Pipeline;
+using SignalNine.Jobs.Services.Pipeline;
 
 namespace SignalNine.Tests.Web.Services.Pipeline;
 

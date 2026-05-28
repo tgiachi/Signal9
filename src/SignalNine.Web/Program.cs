@@ -18,7 +18,7 @@ using SignalNine.Web.Hubs;
 using SignalNine.Jobs.Interfaces;
 using SignalNine.Web.Services;
 using SignalNine.Web.Services.Config;
-using SignalNine.Web.Services.Pipeline;
+using SignalNine.Jobs.Services.Pipeline;
 using SignalNine.Core.Services.Ffmpeg;
 
 const string SwaggerBearerSchemeName = "Bearer";
