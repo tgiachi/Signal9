@@ -363,6 +363,9 @@ public class MediaPipelineJobHandlerTests
         {
             return CancellationToken.None;
         }
+
+        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
+            => DequeueAsync(cancellationToken);
     }
 
     private sealed class NoopJobManager : IJobManager
@@ -431,5 +434,8 @@ public class MediaPipelineJobHandlerTests
         {
             return CancellationToken.None;
         }
+
+        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
+            => DequeueAsync(cancellationToken);
     }
 }

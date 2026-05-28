@@ -354,6 +354,20 @@ public class LibraryScanJobHandlerTests
                 Items.TryGetValue(libraryId, out var list) ? list : new List<JellyfinItem>()
             );
         }
+
+        public Task<JellyfinItemTags> GetItemTagsAsync(string itemId, CancellationToken ct = default)
+        {
+            return Task.FromResult(new JellyfinItemTags(Array.Empty<string>(), Array.Empty<string>()));
+        }
+
+        public Task<IReadOnlyList<JellyfinPreviewImage>> GetPreviewImagesAsync(
+            string itemId,
+            int maxImages,
+            CancellationToken ct = default
+        )
+        {
+            return Task.FromResult<IReadOnlyList<JellyfinPreviewImage>>(Array.Empty<JellyfinPreviewImage>());
+        }
     }
 
     private sealed class StubWalker : ILocalLibraryWalker
@@ -462,6 +476,10 @@ public class LibraryScanJobHandlerTests
         {
             throw new NotSupportedException();
         }
+
+        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
+            => DequeueAsync(cancellationToken);
+
         public Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

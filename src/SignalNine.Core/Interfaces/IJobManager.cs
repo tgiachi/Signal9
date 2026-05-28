@@ -52,6 +52,14 @@ public interface IJobManager
     ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// Waits for the next queued job id on the specified stream target.
+    /// </summary>
+    /// <param name="target">The stream to pull from.</param>
+    /// <param name="cancellationToken">Token used to stop waiting.</param>
+    /// <returns>The next queued job id.</returns>
+    ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Marks a queued job as running and returns an execution context.
     /// </summary>
     /// <param name="jobId">The job id.</param>

@@ -17,7 +17,7 @@ public class JobWorkerServiceTests
     public async Task ExecuteAsync_MaxConcurrentJobsOne_RunsOneJobAtATime()
     {
         var handler = new FakeJobHandler();
-        var manager = new InMemoryJobManager(CreateConfig(), new NoOpJobNotificationPublisher());
+        var manager = new InMemoryJobManager(CreateConfig(), new NoOpJobNotificationPublisher(), new InMemoryJobQueue(), new JobTypeRouter());
         var service = new JobWorkerService(CreateConfig(), [handler], manager);
         using var timeoutSource = new CancellationTokenSource(TestTimeout);
 

@@ -6,6 +6,7 @@ using SignalNine.Core.Services.Ffmpeg;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
+using SignalNine.Persistence.Types;
 using SignalNine.Web.Data.Pipeline;
 using SignalNine.Web.Services.Pipeline;
 
@@ -13,11 +14,24 @@ namespace SignalNine.Tests.Web.Services.Pipeline;
 
 public class ProbeMediaTaskTests
 {
-    private static (ProbeMediaTask Task, StubPool Pool, StubMediaAccess Media, PipelineConfig Config) Build(bool overwrite = false)
+    private static (ProbeMediaTask Task, StubPool Pool, StubMediaAccess Media, PipelineConfig Config) Build(
+        bool overwrite = false,
+        bool allowJellyfinStreamProbe = false
+    )
     {
         var pool = new StubPool();
         var media = new StubMediaAccess();
-        var config = new PipelineConfig { OverwriteExistingProbe = overwrite };
+        var config = new PipelineConfig
+        {
+            Tasks =
+            {
+                Probe =
+                {
+                    OverwriteExisting = overwrite,
+                    AllowJellyfinStreamProbe = allowJellyfinStreamProbe
+                }
+            }
+        };
         var task = new ProbeMediaTask(pool, media, config);
         return (task, pool, media, config);
     }
@@ -52,7 +66,11 @@ public class ProbeMediaTaskTests
         var (task, pool, media, _) = Build();
         pool.NextProbe = new FfprobeResult(TimeSpan.FromSeconds(123), null, null, Array.Empty<FfprobeStream>());
 
-        var entity = new ChannelMediaEntity { DurationSeconds = null };
+        var entity = new ChannelMediaEntity
+        {
+            DurationSeconds = null,
+            SourceType = MediaSourceType.LocalFile
+        };
         var ctx = NewContext(entity);
 
         await task.ExecuteAsync(ctx, CancellationToken.None);
@@ -66,7 +84,11 @@ public class ProbeMediaTaskTests
     {
         var (task, pool, media, _) = Build(overwrite: false);
 
-        var entity = new ChannelMediaEntity { DurationSeconds = 99 };
+        var entity = new ChannelMediaEntity
+        {
+            DurationSeconds = 99,
+            SourceType = MediaSourceType.LocalFile
+        };
         var ctx = NewContext(entity);
 
         await task.ExecuteAsync(ctx, CancellationToken.None);
@@ -82,7 +104,11 @@ public class ProbeMediaTaskTests
         var (task, pool, media, _) = Build(overwrite: true);
         pool.NextProbe = new FfprobeResult(TimeSpan.FromSeconds(500), null, null, Array.Empty<FfprobeStream>());
 
-        var entity = new ChannelMediaEntity { DurationSeconds = 99 };
+        var entity = new ChannelMediaEntity
+        {
+            DurationSeconds = 99,
+            SourceType = MediaSourceType.LocalFile
+        };
         var ctx = NewContext(entity);
 
         await task.ExecuteAsync(ctx, CancellationToken.None);
@@ -97,13 +123,55 @@ public class ProbeMediaTaskTests
         var (task, pool, media, _) = Build();
         pool.NextProbe = new FfprobeResult(null, null, null, Array.Empty<FfprobeStream>());
 
-        var entity = new ChannelMediaEntity { DurationSeconds = null };
+        var entity = new ChannelMediaEntity
+        {
+            DurationSeconds = null,
+            SourceType = MediaSourceType.LocalFile
+        };
         var ctx = NewContext(entity);
 
         await task.ExecuteAsync(ctx, CancellationToken.None);
 
         Assert.Null(entity.DurationSeconds);
         Assert.Empty(media.Updated);
+    }
+
+    [Fact]
+    public async Task Execute_JellyfinWithoutDuration_AndStreamProbeDisabled_SkipsProbe()
+    {
+        var (task, pool, media, _) = Build();
+        var entity = new ChannelMediaEntity
+        {
+            DurationSeconds = null,
+            SourceType = MediaSourceType.Jellyfin,
+            SourceRef = "jf-item-1"
+        };
+        var ctx = NewContext(entity);
+
+        await task.ExecuteAsync(ctx, CancellationToken.None);
+
+        Assert.Equal(0, pool.ProbeCallCount);
+        Assert.Empty(media.Updated);
+    }
+
+    [Fact]
+    public async Task Execute_JellyfinWithoutDuration_AndStreamProbeEnabled_ProbesStream()
+    {
+        var (task, pool, media, _) = Build(allowJellyfinStreamProbe: true);
+        pool.NextProbe = new FfprobeResult(TimeSpan.FromSeconds(80), null, null, Array.Empty<FfprobeStream>());
+        var entity = new ChannelMediaEntity
+        {
+            DurationSeconds = null,
+            SourceType = MediaSourceType.Jellyfin,
+            SourceRef = "jf-item-1"
+        };
+        var ctx = NewContext(entity);
+
+        await task.ExecuteAsync(ctx, CancellationToken.None);
+
+        Assert.Equal(1, pool.ProbeCallCount);
+        Assert.Equal(80, entity.DurationSeconds);
+        Assert.Single(media.Updated);
     }
 
     private sealed class StubPool : IFfmpegPool
@@ -212,6 +280,9 @@ public class ProbeMediaTaskTests
         {
             throw new NotSupportedException();
         }
+
+        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
+            => DequeueAsync(cancellationToken);
 
         public Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
         {

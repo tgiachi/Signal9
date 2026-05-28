@@ -79,7 +79,9 @@ public class InMemoryJobManagerTests
                     MaxLogEntriesPerJob = maxLogEntriesPerJob
                 }
             },
-            new NullJobNotificationPublisher()
+            new NullJobNotificationPublisher(),
+            new InMemoryJobQueue(),
+            new JobTypeRouter()
         );
 
     private sealed class NullJobNotificationPublisher : IJobNotificationPublisher

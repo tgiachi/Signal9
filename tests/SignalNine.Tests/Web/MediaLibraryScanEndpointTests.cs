@@ -255,6 +255,10 @@ public class MediaLibraryScanEndpointTests : IDisposable
             await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
             return Guid.Empty;
         }
+
+        public ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
+            => DequeueAsync(cancellationToken);
+
         public Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

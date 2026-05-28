@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Threading.Channels;
 
 using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Jobs;
@@ -12,7 +11,9 @@ public class InMemoryJobManager : IJobManager
 {
     private const int MinimumLogEntriesPerJob = 1;
 
-    private readonly Channel<Guid> _queue = Channel.CreateUnbounded<Guid>();
+    private readonly IJobQueue _jobQueue;
+    private readonly JobTypeRouter _router;
+    private readonly ConcurrentDictionary<Guid, QueuedJob> _inFlight = new();
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancellationTokens = new();
     private readonly ConcurrentDictionary<Guid, object> _jobLocks = new();
     private readonly ConcurrentDictionary<Guid, JobSnapshot> _jobs = new();
@@ -21,13 +22,22 @@ public class InMemoryJobManager : IJobManager
     private readonly IJobNotificationPublisher _notificationPublisher;
     private long _logSequence;
 
-    public InMemoryJobManager(SignalNineConfig config, IJobNotificationPublisher notificationPublisher)
+    public InMemoryJobManager(
+        SignalNineConfig config,
+        IJobNotificationPublisher notificationPublisher,
+        IJobQueue jobQueue,
+        JobTypeRouter router
+    )
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(notificationPublisher);
+        ArgumentNullException.ThrowIfNull(jobQueue);
+        ArgumentNullException.ThrowIfNull(router);
 
         _maxLogEntriesPerJob = Math.Max(MinimumLogEntriesPerJob, config.JobSystem.MaxLogEntriesPerJob);
         _notificationPublisher = notificationPublisher;
+        _jobQueue = jobQueue;
+        _router = router;
     }
 
     public async Task<JobSnapshot> EnqueueAsync(
@@ -58,7 +68,17 @@ public class InMemoryJobManager : IJobManager
 
         _jobs[snapshot.Id] = snapshot;
         _jobLocks[snapshot.Id] = new object();
-        await _queue.Writer.WriteAsync(snapshot.Id, cancellationToken).ConfigureAwait(false);
+
+        var envelope = new JobEnvelope(
+            JobId: snapshot.Id,
+            Type: snapshot.Type,
+            PayloadJson: snapshot.PayloadJson,
+            WorkDir: $"/signal9_work/jobs/{snapshot.Id}",
+            Attempt: 0,
+            EnqueuedAt: now);
+        var target = _router.ResolveTarget(snapshot.Type);
+        await _jobQueue.PushAsync(envelope, target, cancellationToken).ConfigureAwait(false);
+
         await _notificationPublisher.PublishStatusAsync(Clone(snapshot), cancellationToken).ConfigureAwait(false);
 
         return Clone(snapshot);
@@ -114,8 +134,23 @@ public class InMemoryJobManager : IJobManager
         return true;
     }
 
-    public ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken)
-        => _queue.Reader.ReadAsync(cancellationToken);
+    public async ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken)
+        => await DequeueAsync(JobStreamTarget.Workers, cancellationToken).ConfigureAwait(false);
+
+    public async ValueTask<Guid> DequeueAsync(JobStreamTarget target, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var queued = await _jobQueue.PullAsync("inproc", target, cancellationToken).ConfigureAwait(false);
+            if (queued is null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                continue;
+            }
+            _inFlight[queued.Envelope.JobId] = queued;
+            return queued.Envelope.JobId;
+        }
+    }
 
     public async Task<JobExecutionContext?> StartAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
@@ -258,6 +293,12 @@ public class InMemoryJobManager : IJobManager
         }
 
         await _notificationPublisher.PublishStatusAsync(clonedSnapshot, cancellationToken).ConfigureAwait(false);
+
+        if (_inFlight.TryRemove(jobId, out var queued))
+        {
+            var target = _router.ResolveTarget(queued.Envelope.Type);
+            await _jobQueue.AckAsync(queued.StreamId, target, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private object GetJobLock(Guid jobId)
