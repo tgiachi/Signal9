@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Save } from 'lucide-react';
+import { FolderOpen, Save } from 'lucide-react';
+import { DirectoryPicker } from '@/components/ui/directory-picker';
+import { Button } from '@/components/ui/button';
 import {
   CHANNEL_MEDIA_TYPE_OPTIONS,
   MEDIA_SOURCE_TYPE_OPTIONS,
@@ -32,6 +34,8 @@ export function MediaLibraryForm(props: Props) {
   );
   const [form, setForm] = useState<MediaLibraryFormValues>(initial);
   const [error, setError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const isLocalFile = form.sourceType === 1;
   const isDirty = !sameForm(initial, form);
 
   const submit = async () => {
@@ -107,11 +111,32 @@ export function MediaLibraryForm(props: Props) {
               }))
             }
           />
-          <TextField
-            label="Source reference"
-            value={form.sourceRef}
-            onChange={(sourceRef) => setForm((current) => ({ ...current, sourceRef }))}
-          />
+          <div className="block">
+            <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
+              Source reference
+            </span>
+            <div className="mt-1 flex gap-2">
+              <input
+                value={form.sourceRef}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, sourceRef: event.target.value }))
+                }
+                className="w-full rounded-[6px] bg-bg-1 px-2.5 py-2 text-[12px] text-fg-1 outline-none transition placeholder:text-fg-3 focus:[box-shadow:inset_0_0_0_2px_var(--accent-live)]"
+              />
+              {isLocalFile && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Browse server filesystem"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <FolderOpen />
+                  Browse…
+                </Button>
+              )}
+            </div>
+          </div>
           <label className="block md:col-span-2">
             <span className="font-mono text-[10px] uppercase tracking-label text-fg-3">
               Description
@@ -154,6 +179,12 @@ export function MediaLibraryForm(props: Props) {
           {props.isSaving ? 'Saving' : props.mode === 'edit' ? 'Save' : 'Create'}
         </button>
       </footer>
+      <DirectoryPicker
+        open={pickerOpen}
+        initialPath={form.sourceRef || '/'}
+        onOpenChange={setPickerOpen}
+        onSelect={(picked) => setForm((current) => ({ ...current, sourceRef: picked }))}
+      />
     </div>
   );
 }
