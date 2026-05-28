@@ -7,6 +7,7 @@ import { useConfig } from '@/features/config/use-config';
 import { useJobsContext } from './jobs-context-value';
 import { JobQueuePanel } from './job-queue-panel';
 import type { EnqueueJobInput } from './use-jobs';
+import { WorkersPanel } from './workers-panel';
 
 const DEFAULT_PAYLOAD = '{\n  "source": "demo.mp4"\n}';
 
@@ -60,6 +61,7 @@ export function JobsPage() {
         isCanceling={jobs.isCanceling}
       />
       <aside className="flex min-h-0 flex-col gap-3">
+        <WorkersPanel />
         <section className="overflow-hidden rounded-[6px] bg-bg-2">
           <header className="flex items-center gap-2 bg-bg-4 px-3 py-2">
             <Plus className="size-4 text-accent-live" />
