@@ -65,11 +65,12 @@ builder.Services.AddDataProtection();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient("jellyfin", c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddSingleton<IProcessLauncher, DefaultProcessLauncher>();
-builder.Services.AddSingleton<IFfmpegPool>(sp =>
-    new FfmpegPool(
-        sp.GetRequiredService<IProcessLauncher>(),
-        sp.GetRequiredService<SignalNineConfig>().FfmpegPool
-    )
+builder.Services.AddSingleton<IFfmpegPool>(
+    sp =>
+        new FfmpegPool(
+            sp.GetRequiredService<IProcessLauncher>(),
+            sp.GetRequiredService<SignalNineConfig>().FfmpegPool
+        )
 );
 builder.Services.AddHostedService<FfmpegPoolBroadcastService>();
 builder.Services.AddSingleton<ILocalLibraryWalker, LocalLibraryWalker>();
@@ -89,16 +90,15 @@ builder.Services.AddSingleton<ConfigSchemaService>();
 builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<JobTypeRouter>();
+
 // Job queue + bus: Redis if Redis.Url set, in-memory otherwise.
 if (!string.IsNullOrWhiteSpace(signalNineConfig.Redis.Url))
 {
     var redisConfig = ConfigurationOptions.Parse(signalNineConfig.Redis.Url);
     redisConfig.AbortOnConnectFail = false;
     redisConfig.DefaultDatabase = signalNineConfig.Redis.Database;
-    builder.Services.AddSingleton<IConnectionMultiplexer>(
-        _ => ConnectionMultiplexer.Connect(redisConfig));
-    builder.Services.AddSingleton<RedisStreamKeys>(
-        sp => new RedisStreamKeys(signalNineConfig.Redis));
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConfig));
+    builder.Services.AddSingleton<RedisStreamKeys>(sp => new RedisStreamKeys(signalNineConfig.Redis));
     builder.Services.AddSingleton<IJobQueue,
         RedisJobQueue>();
     builder.Services.AddSingleton<IJobBus,
@@ -113,8 +113,10 @@ else
 }
 builder.Services.AddSingleton<IWorkerRegistry, InMemoryWorkerRegistry>();
 var assetsRoot = directoriesConfig[DirectoryType.Assets];
-builder.Services.AddSingleton<IAssetStore>(_ =>
-                                               new FileSystemAssetStore(assetsRoot));
+builder.Services.AddSingleton<IAssetStore>(
+    _ =>
+        new FileSystemAssetStore(assetsRoot)
+);
 builder.Services.AddSingleton<IJobResultProcessor,
     MediaPipelineResultProcessor>();
 builder.Services.AddSingleton<IJobResultProcessor,
@@ -126,28 +128,41 @@ builder.Services.AddScoped(typeof(IDataAccess<>), typeof(FreeSqlDataAccess<>));
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
 builder.Services.AddScoped<DefaultUserSeeder>();
 builder.Services.AddSingleton<WorkSpaceStager>();
+
 // Two worker loops: internal-only (library.scan) and workers-target (media.pipeline).
 // Use Add(ServiceDescriptor.Singleton) directly to bypass TryAddEnumerable deduplication,
 // which would silently drop the second registration when both use the same implementation type.
-builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWorkerService(
-    sp.GetRequiredService<SignalNineConfig>(),
-    sp.GetServices<IJobHandler>(),
-    sp.GetRequiredService<IJobManager>(),
-    sp.GetRequiredService<IJobBus>(),
-    JobStreamTarget.Internal)));
+builder.Services.Add(
+    ServiceDescriptor.Singleton<IHostedService>(
+        sp => new JobWorkerService(
+            sp.GetRequiredService<SignalNineConfig>(),
+            sp.GetServices<IJobHandler>(),
+            sp.GetRequiredService<IJobManager>(),
+            sp.GetRequiredService<IJobBus>(),
+            JobStreamTarget.Internal
+        )
+    )
+);
+
 if (signalNineConfig.JobSystem.RunInProcessWorker)
 {
-    builder.Services.Add(ServiceDescriptor.Singleton<IHostedService>(sp => new JobWorkerService(
-        sp.GetRequiredService<SignalNineConfig>(),
-        sp.GetServices<IJobHandler>(),
-        sp.GetRequiredService<IJobManager>(),
-        sp.GetRequiredService<IJobBus>(),
-        JobStreamTarget.Workers)));
+    builder.Services.Add(
+        ServiceDescriptor.Singleton<IHostedService>(
+            sp => new JobWorkerService(
+                sp.GetRequiredService<SignalNineConfig>(),
+                sp.GetServices<IJobHandler>(),
+                sp.GetRequiredService<IJobManager>(),
+                sp.GetRequiredService<IJobBus>(),
+                JobStreamTarget.Workers
+            )
+        )
+    );
 }
 builder.Services.AddHostedService<JobBusToManagerAdapter>();
 builder.Services.AddHostedService<LogsBroadcastService>();
 builder.Services.AddHostedService<WorkSpaceJanitor>();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services
+       .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
        .AddJwtBearer(
            options =>
            {
@@ -155,21 +170,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                options.Events = new JwtBearerEvents
                {
                    OnMessageReceived = context =>
-                   {
-                       var accessToken = context.Request.Query["access_token"].ToString();
-                       var path = context.HttpContext.Request.Path;
+                                       {
+                                           var accessToken = context.Request.Query["access_token"].ToString();
+                                           var path = context.HttpContext.Request.Path;
 
-                       if (
-                           !string.IsNullOrWhiteSpace(accessToken) &&
-                           (path.StartsWithSegments(JobsHubPathPrefix) ||
-                               (path.StartsWithSegments("/api/media") && path.Value!.EndsWith("/stream")))
-                       )
-                       {
-                           context.Token = accessToken;
-                       }
+                                           if (
+                                               !string.IsNullOrWhiteSpace(accessToken) &&
+                                               (path.StartsWithSegments(JobsHubPathPrefix) ||
+                                                (path.StartsWithSegments("/api/media") && path.Value!.EndsWith("/stream")))
+                                           )
+                                           {
+                                               context.Token = accessToken;
+                                           }
 
-                       return Task.CompletedTask;
-                   }
+                                           return Task.CompletedTask;
+                                       }
                };
            }
        );
@@ -180,8 +195,10 @@ builder.Services.Configure<FormOptions>(
         options.MultipartBodyLengthLimit = ChannelLogoUploadMultipartBodyLengthLimit;
     }
 );
-var healthChecks = builder.Services.AddHealthChecks()
-       .AddCheck<FreeSqlHealthCheck>("database");
+var healthChecks = builder.Services
+                          .AddHealthChecks()
+                          .AddCheck<FreeSqlHealthCheck>("database");
+
 if (!string.IsNullOrWhiteSpace(signalNineConfig.Redis.Url))
 {
     healthChecks.AddCheck<RedisHealthCheck>("redis");
