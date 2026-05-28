@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Database, Filter, Play, Plus, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Cog, Database, Filter, Play, Plus, RefreshCw, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -98,6 +98,16 @@ export function MediaLibrariesPage() {
     try {
       const job = await mediaLibraries.scanMediaLibrary(library.id);
       toast.success(`Library scan enqueued: ${job.id.slice(0, 8)}`);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  };
+
+  const processAllLibrary = async (library: MediaLibraryResponse) => {
+    if (!window.confirm(`Force re-process all media in "${library.name}"?`)) return;
+    try {
+      const count = await mediaLibraries.processAllMediaLibrary(library.id);
+      toast.success(`Enqueued ${count} pipeline job${count === 1 ? '' : 's'}`);
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -241,6 +251,18 @@ export function MediaLibrariesPage() {
                   >
                     <Play className="size-3" />
                     Scan
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Force process all ${library.name}`}
+                    disabled={!library.isActive || mediaLibraries.isProcessingAll}
+                    onClick={() => {
+                      void processAllLibrary(library);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-[6px] bg-accent-cfg px-2.5 py-1.5 text-[12px] font-semibold text-fg-0 transition hover:opacity-90 disabled:bg-bg-2 disabled:text-fg-3 disabled:opacity-40"
+                  >
+                    <Cog className="size-3" />
+                    Force process
                   </button>
                   <button
                     type="button"

@@ -95,6 +95,19 @@ export function useMediaLibraries() {
     },
   });
 
+  const processAll = useMutation({
+    mutationFn: async (id: string) => {
+      const data = await apiJson<{ enqueuedCount: number }>(
+        `/api/media-libraries/${id}/process-all`,
+        { method: 'POST' },
+      );
+      return data.enqueuedCount;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
+    },
+  });
+
   const libraries = useMemo(
     () => (query.data ?? []).slice().sort((left, right) => left.name.localeCompare(right.name)),
     [query.data],
@@ -111,8 +124,10 @@ export function useMediaLibraries() {
     updateMediaLibrary: update.mutateAsync,
     deleteMediaLibrary: remove.mutateAsync,
     scanMediaLibrary: scan.mutateAsync,
+    processAllMediaLibrary: processAll.mutateAsync,
     isSaving: create.isPending || update.isPending,
     isDeleting: remove.isPending,
     isScanning: scan.isPending,
+    isProcessingAll: processAll.isPending,
   };
 }

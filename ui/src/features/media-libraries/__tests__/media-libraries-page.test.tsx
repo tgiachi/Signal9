@@ -147,6 +147,36 @@ describe('MediaLibrariesPage', () => {
       ).toBe(true),
     );
   });
+
+  it('force-processes all media after user confirmation', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (
+        String(input) === '/api/media-libraries/library-1/process-all' &&
+        init?.method === 'POST'
+      ) {
+        return Response.json({ enqueuedCount: 5 }, { status: 200 });
+      }
+      return Response.json([LIBRARY]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+
+    await screen.findByText('Feature films');
+    await userEvent.click(screen.getByRole('button', { name: /force process all Movies/i }));
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            String(input) === '/api/media-libraries/library-1/process-all' &&
+            init?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+    confirmSpy.mockRestore();
+  });
 });
 
 function renderPage() {
