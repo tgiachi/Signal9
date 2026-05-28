@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Data.Pipeline;
 using SignalNine.Core.Interfaces;
+using SignalNine.Core.Services;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
@@ -49,7 +50,8 @@ public class MediaPipelineJobHandlerTests
     private static JobExecutionContext NewContext(Guid mediaId)
     {
         var payload = JsonSerializer.Serialize(new MediaPipelinePayload(mediaId));
-        return new JobExecutionContext(Guid.NewGuid(), payload, new NoopJobManager());
+        var workDir = Path.Combine(Path.GetTempPath(), $"signalnine-tests-{Guid.NewGuid():N}");
+        return new JobExecutionContext(Guid.NewGuid(), payload, workDir, new InMemoryJobBus());
     }
 
     private static MediaLibraryEntity NewLib()

@@ -81,7 +81,8 @@ public class InMemoryJobManagerTests
             },
             new NullJobNotificationPublisher(),
             new InMemoryJobQueue(),
-            new JobTypeRouter()
+            new JobTypeRouter(),
+            new InMemoryJobBus()
         );
 
     private sealed class NullJobNotificationPublisher : IJobNotificationPublisher

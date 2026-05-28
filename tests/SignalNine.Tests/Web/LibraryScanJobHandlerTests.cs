@@ -4,6 +4,7 @@ using SignalNine.Core.Data.Channels;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Interfaces;
+using SignalNine.Core.Services;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
@@ -38,7 +39,8 @@ public class LibraryScanJobHandlerTests
     private static JobExecutionContext NewContext(Guid mediaLibraryId)
     {
         var payload = JsonSerializer.Serialize(new ScanLibraryPayload(mediaLibraryId));
-        return new JobExecutionContext(Guid.NewGuid(), payload, new StubJobManager());
+        var workDir = Path.Combine(Path.GetTempPath(), $"signalnine-tests-{Guid.NewGuid():N}");
+        return new JobExecutionContext(Guid.NewGuid(), payload, workDir, new InMemoryJobBus());
     }
 
     private static MediaLibraryEntity NewJellyfinLibrary(ChannelMediaType type, bool active = true)

@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Jobs.Results;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Types;
 
@@ -18,13 +19,14 @@ public class FakeJobHandler : IJobHandler
 
     public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public async Task ExecuteAsync(JobExecutionContext context, CancellationToken cancellationToken)
+    public async Task<IJobResult> ExecuteAsync(JobExecutionContext context, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _startedCount);
         Started.TrySetResult();
         await context.WriteLogAsync(JobLogLevelType.Information, "Started", cancellationToken);
         await Release.Task.WaitAsync(cancellationToken);
         await context.ReportProgressAsync(100, "Done", cancellationToken);
+        return new EmptyJobResult(Type);
     }
 
     public async Task WaitForStartedCountAsync(int expectedCount, CancellationToken cancellationToken)

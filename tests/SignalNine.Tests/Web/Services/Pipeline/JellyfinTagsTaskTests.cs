@@ -2,6 +2,7 @@ using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Jellyfin;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Interfaces;
+using SignalNine.Core.Services;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
@@ -98,7 +99,7 @@ public class JellyfinTagsTaskTests
             media,
             new MediaLibraryEntity { Id = Guid.NewGuid(), Name = "L", IsActive = true, SourceRef = "/x" },
             "/some/file.mp4",
-            new JobExecutionContext(Guid.NewGuid(), "{}", new NoopJobManager())
+            new JobExecutionContext(Guid.NewGuid(), "{}", Path.Combine(Path.GetTempPath(), $"signalnine-tests-{Guid.NewGuid():N}"), new InMemoryJobBus())
         );
     }
 

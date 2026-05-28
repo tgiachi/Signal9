@@ -3,6 +3,7 @@ using SignalNine.Core.Data.Ffmpeg;
 using SignalNine.Core.Data.Jobs;
 using SignalNine.Core.Directories;
 using SignalNine.Core.Interfaces;
+using SignalNine.Core.Services;
 using SignalNine.Core.Services.Ffmpeg;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
@@ -271,7 +272,7 @@ public class ExtractPreviewsTaskTests : IDisposable
             media,
             new MediaLibraryEntity { Id = Guid.NewGuid(), Name = "L", IsActive = true, SourceRef = "/x" },
             ResolvedPath,
-            new JobExecutionContext(Guid.NewGuid(), "{}", new NoopJobManager())
+            new JobExecutionContext(Guid.NewGuid(), "{}", Path.Combine(Path.GetTempPath(), $"signalnine-tests-{Guid.NewGuid():N}"), new InMemoryJobBus())
         );
     }
 

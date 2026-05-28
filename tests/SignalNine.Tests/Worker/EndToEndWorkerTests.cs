@@ -1,6 +1,8 @@
 // tests/SignalNine.Tests/Worker/EndToEndWorkerTests.cs
 using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Jobs.Results;
+using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services;
 using SignalNine.Core.Services.Redis;
 using SignalNine.Tests.Support;
@@ -39,10 +41,10 @@ public class EndToEndWorkerTests : IAsyncLifetime
     {
         public string Type => "e2e.echo";
         public readonly TaskCompletionSource<JobExecutionContext> Received = new();
-        public Task ExecuteAsync(JobExecutionContext ctx, CancellationToken ct)
+        public Task<IJobResult> ExecuteAsync(JobExecutionContext ctx, CancellationToken ct)
         {
             Received.TrySetResult(ctx);
-            return Task.CompletedTask;
+            return Task.FromResult<IJobResult>(new EmptyJobResult(Type));
         }
     }
 

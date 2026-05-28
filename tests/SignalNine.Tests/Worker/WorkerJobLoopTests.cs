@@ -1,6 +1,7 @@
 // tests/SignalNine.Tests/Worker/WorkerJobLoopTests.cs
 using SignalNine.Core.Data.Config;
 using SignalNine.Core.Data.Jobs;
+using SignalNine.Core.Data.Jobs.Results;
 using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services;
 using SignalNine.Core.Types;
@@ -12,11 +13,11 @@ public class WorkerJobLoopTests
 {
     private sealed class StubHandler : IJobHandler
     {
-        private readonly Func<JobExecutionContext, CancellationToken, Task> _impl;
-        public StubHandler(string type, Func<JobExecutionContext, CancellationToken, Task> impl)
+        private readonly Func<JobExecutionContext, CancellationToken, Task<IJobResult>> _impl;
+        public StubHandler(string type, Func<JobExecutionContext, CancellationToken, Task<IJobResult>> impl)
         { Type = type; _impl = impl; }
         public string Type { get; }
-        public Task ExecuteAsync(JobExecutionContext context, CancellationToken ct) => _impl(context, ct);
+        public Task<IJobResult> ExecuteAsync(JobExecutionContext context, CancellationToken ct) => _impl(context, ct);
     }
 
     private static WorkerJobLoop NewLoop(IJobQueue queue, IJobBus bus, IEnumerable<IJobHandler> handlers, int concurrency = 1)
@@ -35,7 +36,7 @@ public class WorkerJobLoopTests
         var handler = new StubHandler("test.echo", (ctx, _) =>
         {
             executed.TrySetResult(ctx);
-            return Task.CompletedTask;
+            return Task.FromResult<IJobResult>(new EmptyJobResult("test.echo"));
         });
 
         var loop = NewLoop(queue, bus, new[] { handler });
@@ -58,7 +59,7 @@ public class WorkerJobLoopTests
         var queue = new InMemoryJobQueue();
         var bus = new InMemoryJobBus();
         var resultTcs = new TaskCompletionSource<JobResultEvent>();
-        var handler = new StubHandler("test.ok", (_, __) => Task.CompletedTask);
+        var handler = new StubHandler("test.ok", (_, __) => Task.FromResult<IJobResult>(new EmptyJobResult("test.ok")));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         var subscribe = Task.Run(async () =>
