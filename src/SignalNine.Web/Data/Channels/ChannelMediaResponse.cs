@@ -19,5 +19,6 @@ public record ChannelMediaResponse(
     string? CommercialCampaign,
     string? InformationEdition,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    IReadOnlyList<TagSummary> Tags
 );

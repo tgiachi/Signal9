@@ -77,18 +77,66 @@ public static class ChannelMediaEndpoints
 
     private static Ok<IReadOnlyList<ChannelMediaResponse>> List(
         IDataAccess<ChannelMediaEntity> dataAccess,
+        IDataAccess<TagEntity> tagAccess,
+        IDataAccess<ChannelMediaTagEntity> joinAccess,
         ChannelMediaType? type
     )
     {
         IEnumerable<ChannelMediaEntity> query = dataAccess.List();
         if (type is not null) query = query.Where(m => m.Type == type.Value);
-        return TypedResults.Ok<IReadOnlyList<ChannelMediaResponse>>(query.Select(ToResponse).ToList());
+
+        var tagsById = tagAccess.List().ToDictionary(t => t.Id);
+        var tagsByMedia = joinAccess
+            .List()
+            .GroupBy(j => j.ChannelMediaId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<TagSummary>)g
+                    .Where(j => tagsById.ContainsKey(j.TagId))
+                    .Select(j =>
+                    {
+                        var t = tagsById[j.TagId];
+                        return new TagSummary(t.Id, t.Name, t.Label);
+                    })
+                    .ToList()
+            );
+
+        return TypedResults.Ok<IReadOnlyList<ChannelMediaResponse>>(
+            query
+                .Select(m => ToResponse(m, tagsByMedia.GetValueOrDefault(m.Id) ?? Array.Empty<TagSummary>()))
+                .ToList()
+        );
     }
 
-    private static Results<Ok<ChannelMediaResponse>, NotFound> GetById(Guid id, IDataAccess<ChannelMediaEntity> dataAccess)
+    private static Results<Ok<ChannelMediaResponse>, NotFound> GetById(
+        Guid id,
+        IDataAccess<ChannelMediaEntity> dataAccess,
+        IDataAccess<TagEntity> tagAccess,
+        IDataAccess<ChannelMediaTagEntity> joinAccess
+    )
     {
         var entity = dataAccess.GetByKey(id);
-        return entity is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(entity));
+        if (entity is null) return TypedResults.NotFound();
+        return TypedResults.Ok(ToResponse(entity, TagsFor(id, tagAccess, joinAccess)));
+    }
+
+    private static IReadOnlyList<TagSummary> TagsFor(
+        Guid mediaId,
+        IDataAccess<TagEntity> tagAccess,
+        IDataAccess<ChannelMediaTagEntity> joinAccess
+    )
+    {
+        var tagIds = joinAccess
+            .List()
+            .Where(j => j.ChannelMediaId == mediaId)
+            .Select(j => j.TagId)
+            .ToHashSet();
+        if (tagIds.Count == 0) return Array.Empty<TagSummary>();
+        return tagAccess
+            .List()
+            .Where(t => tagIds.Contains(t.Id))
+            .Select(t => new TagSummary(t.Id, t.Name, t.Label))
+            .ToList();
     }
 
     private static Results<Created<ChannelMediaResponse>, BadRequest<string>> Create(
@@ -263,7 +311,10 @@ public static class ChannelMediaEndpoints
         );
     }
 
-    private static ChannelMediaResponse ToResponse(ChannelMediaEntity e) =>
+    private static ChannelMediaResponse ToResponse(
+        ChannelMediaEntity e,
+        IReadOnlyList<TagSummary>? tags = null
+    ) =>
         new(
             e.Id, e.Type, e.Title, e.DurationSeconds, e.IsActive,
             e.SourceType, e.SourceRef,
@@ -271,6 +322,7 @@ public static class ChannelMediaEndpoints
             e.TvSeriesName, e.TvSeason, e.TvEpisode,
             e.CommercialAdvertiser, e.CommercialCampaign,
             e.InformationEdition,
-            e.CreatedAt, e.UpdatedAt
+            e.CreatedAt, e.UpdatedAt,
+            tags ?? Array.Empty<TagSummary>()
         );
 }
