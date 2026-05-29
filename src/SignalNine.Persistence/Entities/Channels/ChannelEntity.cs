@@ -42,6 +42,15 @@ public class ChannelEntity
     [Column(StringLength = 128)]
     public string? FallbackTypeFilterCsv { get; set; }
 
+    public int OutputWidth { get; set; } = 1280;
+
+    public int OutputHeight { get; set; } = 720;
+
+    public int OutputVideoBitrateKbps { get; set; } = 2500;
+
+    [Column(StringLength = -1)]
+    public string? VideoEffectsJson { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
