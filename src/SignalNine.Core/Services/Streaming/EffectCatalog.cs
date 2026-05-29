@@ -88,4 +88,37 @@ public static class EffectCatalog
             p => "colortemperature=temperature=" + p["kelvin"].ToString(System.Globalization.CultureInfo.InvariantCulture)
         )
     };
+
+    private static readonly Dictionary<string, EffectDescriptor> ByKind = BuildIndex();
+
+    private static Dictionary<string, EffectDescriptor> BuildIndex()
+    {
+        var dict = new Dictionary<string, EffectDescriptor>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in Items)
+        {
+            dict[item.Kind] = item;
+        }
+        return dict;
+    }
+
+    public static string BuildFilter(IEnumerable<ChannelEffect> effects, int width, int height)
+    {
+        ArgumentNullException.ThrowIfNull(effects);
+
+        var parts = new List<string> { $"scale={width}:{height}:flags=lanczos" };
+        foreach (var effect in effects)
+        {
+            if (!effect.Enabled) continue;
+            if (!ByKind.TryGetValue(effect.Kind, out var descriptor)) continue;
+
+            var merged = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            foreach (var param in descriptor.Parameters)
+            {
+                merged[param.Name] = effect.Params.TryGetValue(param.Name, out var v) ? v : param.Default;
+            }
+            parts.Add(descriptor.RenderFilter(merged));
+        }
+        parts.Add("format=yuv420p");
+        return string.Join(",", parts);
+    }
 }
