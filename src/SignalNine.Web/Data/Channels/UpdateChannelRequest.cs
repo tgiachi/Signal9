@@ -14,5 +14,9 @@ public record UpdateChannelRequest(
     int CommercialIntervalJitterSeconds = 120,
     bool CommercialBumpersEnabled = true,
     string? FallbackTagFilterCsv = null,
-    string? FallbackTypeFilterCsv = null
+    string? FallbackTypeFilterCsv = null,
+    int OutputWidth = 1280,
+    int OutputHeight = 720,
+    int OutputVideoBitrateKbps = 2500,
+    string? VideoEffectsJson = null
 );

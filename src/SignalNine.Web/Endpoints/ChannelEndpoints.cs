@@ -74,6 +74,10 @@ public static class ChannelEndpoints
             CommercialBumpersEnabled = request.CommercialBumpersEnabled,
             FallbackTagFilterCsv = request.FallbackTagFilterCsv,
             FallbackTypeFilterCsv = request.FallbackTypeFilterCsv,
+            OutputWidth = request.OutputWidth,
+            OutputHeight = request.OutputHeight,
+            OutputVideoBitrateKbps = request.OutputVideoBitrateKbps,
+            VideoEffectsJson = request.VideoEffectsJson,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -115,6 +119,10 @@ public static class ChannelEndpoints
         entity.CommercialBumpersEnabled = request.CommercialBumpersEnabled;
         entity.FallbackTagFilterCsv = request.FallbackTagFilterCsv;
         entity.FallbackTypeFilterCsv = request.FallbackTypeFilterCsv;
+        entity.OutputWidth = request.OutputWidth;
+        entity.OutputHeight = request.OutputHeight;
+        entity.OutputVideoBitrateKbps = request.OutputVideoBitrateKbps;
+        entity.VideoEffectsJson = request.VideoEffectsJson;
         entity.UpdatedAt = DateTime.UtcNow;
 
         dataAccess.Update(entity);
@@ -136,6 +144,7 @@ public static class ChannelEndpoints
             e.IsActive, e.CommercialsEnabled, e.CommercialIntervalMinSeconds, e.CommercialIntervalMaxSeconds,
             e.CreatedAt, e.UpdatedAt,
             e.CommercialBreakSize, e.CommercialIntervalJitterSeconds, e.CommercialBumpersEnabled,
-            e.FallbackTagFilterCsv, e.FallbackTypeFilterCsv
+            e.FallbackTagFilterCsv, e.FallbackTypeFilterCsv,
+            e.OutputWidth, e.OutputHeight, e.OutputVideoBitrateKbps, e.VideoEffectsJson
         );
 }

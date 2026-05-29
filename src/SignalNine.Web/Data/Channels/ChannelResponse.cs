@@ -17,5 +17,9 @@ public record ChannelResponse(
     int CommercialIntervalJitterSeconds,
     bool CommercialBumpersEnabled,
     string? FallbackTagFilterCsv,
-    string? FallbackTypeFilterCsv
+    string? FallbackTypeFilterCsv,
+    int OutputWidth,
+    int OutputHeight,
+    int OutputVideoBitrateKbps,
+    string? VideoEffectsJson
 );
