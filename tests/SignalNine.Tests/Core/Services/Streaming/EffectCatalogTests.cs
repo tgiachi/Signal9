@@ -20,4 +20,19 @@ public class EffectCatalogTests
         Assert.Equal(1, vhs.Parameters.Count);
         Assert.Equal("intensity", vhs.Parameters[0].Name);
     }
+
+    [Fact]
+    public void Items_ContainsAllTenPresets()
+    {
+        var expected = new[]
+        {
+            "vhs", "scanlines", "blackwhite", "sepia", "vignette",
+            "grain8mm", "brightness", "contrast", "saturation", "colortemp"
+        };
+        var actual = EffectCatalog.Items.Select(d => d.Kind).ToList();
+        foreach (var kind in expected)
+        {
+            Assert.Contains(kind, actual);
+        }
+    }
 }
