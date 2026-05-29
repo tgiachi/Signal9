@@ -7,6 +7,7 @@ export function useRebuildSchedule(channelId: string) {
     mutationFn: (body: { fromUtc?: string; hoursAhead?: number }) =>
       apiEmpty(`/api/channels/${channelId}/schedule/rebuild`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }),
     onSuccess: () => {

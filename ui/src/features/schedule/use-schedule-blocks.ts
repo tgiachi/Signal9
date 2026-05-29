@@ -21,6 +21,7 @@ export function useScheduleBlocks(channelId: string) {
     mutationFn: (input: ScheduleBlockInput) =>
       apiJson<ScheduleBlock>(`/api/channels/${channelId}/schedule/blocks`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: blocksKey(channelId) }),
@@ -30,6 +31,7 @@ export function useScheduleBlocks(channelId: string) {
     mutationFn: ({ id, input }: { id: string; input: ScheduleBlockInput }) =>
       apiJson<ScheduleBlock>(`/api/schedule/blocks/${id}`, {
         method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: blocksKey(channelId) }),
