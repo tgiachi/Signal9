@@ -27,6 +27,24 @@ public sealed class SchedulePlannerService
         return Task.FromResult(0);
     }
 
+    public sealed record ResolveContext(
+        IReadOnlyList<ChannelMediaEntity> AllMedia,
+        IReadOnlyDictionary<Guid, HashSet<string>> TagsByMedia,
+        DateTime Cursor
+    );
+
+    public static Guid? ResolveBlock(ScheduleBlockEntity block, ResolveContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(ctx);
+
+        return block.RuleType switch
+        {
+            ScheduleBlockRuleType.Pin => block.PinnedChannelMediaId,
+            _ => null
+        };
+    }
+
     public static ScheduleBlockEntity? FindBlockCovering(
         IEnumerable<ScheduleBlockEntity> blocks,
         DateTime cursor)

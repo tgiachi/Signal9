@@ -68,4 +68,33 @@ public class SchedulePlannerServiceTests
 
         Assert.Null(SchedulePlannerService.FindBlockCovering(new[] { block }, cursor));
     }
+
+    [Fact]
+    public void ResolveBlock_Pin_ReturnsPinnedMediaId()
+    {
+        var pinned = Guid.NewGuid();
+        var block = new ScheduleBlockEntity
+        {
+            RuleType = ScheduleBlockRuleType.Pin,
+            PinnedChannelMediaId = pinned
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            AllMedia: Array.Empty<ChannelMediaEntity>(),
+            TagsByMedia: new Dictionary<Guid, HashSet<string>>(),
+            Cursor: DateTime.UtcNow);
+
+        Assert.Equal(pinned, SchedulePlannerService.ResolveBlock(block, ctx));
+    }
+
+    [Fact]
+    public void ResolveBlock_Pin_NullPinnedId_ReturnsNull()
+    {
+        var block = new ScheduleBlockEntity { RuleType = ScheduleBlockRuleType.Pin, PinnedChannelMediaId = null };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            AllMedia: Array.Empty<ChannelMediaEntity>(),
+            TagsByMedia: new Dictionary<Guid, HashSet<string>>(),
+            Cursor: DateTime.UtcNow);
+
+        Assert.Null(SchedulePlannerService.ResolveBlock(block, ctx));
+    }
 }
