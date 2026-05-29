@@ -43,6 +43,10 @@ export type CreateChannelInput = {
 
 export type UpdateChannelInput = CreateChannelInput & {
   isActive: boolean;
+  outputWidth?: number;
+  outputHeight?: number;
+  outputVideoBitrateKbps?: number;
+  videoEffectsJson?: string | null;
 };
 
 export type ChannelLogoUploadResponse = {
