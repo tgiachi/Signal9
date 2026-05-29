@@ -1,4 +1,5 @@
 import { Eye, Plus, RefreshCw, Search, SignalHigh } from 'lucide-react';
+import { Link } from 'react-router';
 import type { ChannelResponse } from './channel-types';
 import { cn } from '@/lib/cn';
 
@@ -92,7 +93,7 @@ export function ChannelList({
           <span>Description</span>
           <span>Status</span>
           <span>Commercials</span>
-          <span>Open</span>
+          <span>Actions</span>
         </div>
 
         {isLoading ? (
@@ -142,9 +143,18 @@ export function ChannelList({
                   ? `${channel.commercialIntervalMinSeconds}-${channel.commercialIntervalMaxSeconds}s`
                   : 'disabled'}
               </span>
-              <span className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-label">
-                <Eye className="size-3.5" />
-                Edit
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-label">
+                  <Eye className="size-3.5" />
+                  Edit
+                </span>
+                <Link
+                  to={`/channels/${channel.id}/schedule`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="rounded bg-bg-1 px-2 py-1 text-[11px] text-fg-2 hover:bg-bg-3"
+                >
+                  Schedule
+                </Link>
               </span>
             </button>
           ))
@@ -200,6 +210,13 @@ function ChannelCard({
                 ? `${channel.commercialIntervalMinSeconds}-${channel.commercialIntervalMaxSeconds}s ads`
                 : 'ads off'}
             </span>
+            <Link
+              to={`/channels/${channel.id}/schedule`}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded bg-bg-1 px-2 py-1 text-[11px] text-fg-2 hover:bg-bg-3"
+            >
+              Schedule
+            </Link>
           </div>
         </div>
       </div>
