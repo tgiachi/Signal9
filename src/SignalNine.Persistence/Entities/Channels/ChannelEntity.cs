@@ -30,6 +30,18 @@ public class ChannelEntity
     public int CommercialIntervalMinSeconds { get; set; } = 120;
     public int CommercialIntervalMaxSeconds { get; set; } = 300;
 
+    public int CommercialBreakSize { get; set; } = 2;
+
+    public int CommercialIntervalJitterSeconds { get; set; } = 120;
+
+    public bool CommercialBumpersEnabled { get; set; } = true;
+
+    [Column(StringLength = 512)]
+    public string? FallbackTagFilterCsv { get; set; }
+
+    [Column(StringLength = 128)]
+    public string? FallbackTypeFilterCsv { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
