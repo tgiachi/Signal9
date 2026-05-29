@@ -155,6 +155,13 @@ export function ChannelList({
                 >
                   Schedule
                 </Link>
+                <Link
+                  to={`/channels/${channel.id}/stream`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="rounded bg-bg-1 px-2 py-1 text-[11px] text-fg-2 hover:bg-bg-3"
+                >
+                  Stream
+                </Link>
               </span>
             </button>
           ))
@@ -216,6 +223,13 @@ function ChannelCard({
               className="rounded bg-bg-1 px-2 py-1 text-[11px] text-fg-2 hover:bg-bg-3"
             >
               Schedule
+            </Link>
+            <Link
+              to={`/channels/${channel.id}/stream`}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded bg-bg-1 px-2 py-1 text-[11px] text-fg-2 hover:bg-bg-3"
+            >
+              Stream
             </Link>
           </div>
         </div>

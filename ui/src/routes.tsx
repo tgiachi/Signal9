@@ -11,6 +11,7 @@ import { ChannelMediaPage } from '@/features/media/channel-media-page';
 import { FfmpegPage } from '@/features/ffmpeg/ffmpeg-page';
 import { PipelineConfigPage } from '@/features/pipelines/pipeline-config-page';
 import { SchedulePage } from '@/features/schedule/schedule-page';
+import { StreamPage } from '@/features/stream/stream-page';
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: 'monitor', element: <MonitorPage /> },
       { path: 'channels', element: <ChannelsPage /> },
       { path: 'channels/:channelId/schedule', element: <SchedulePage /> },
+      { path: 'channels/:channelId/stream', element: <StreamPage /> },
       { path: 'media-libraries', element: <MediaLibrariesPage /> },
       { path: 'media', element: <ChannelMediaPage /> },
       { path: 'pipelines', element: <PipelineConfigPage /> },
