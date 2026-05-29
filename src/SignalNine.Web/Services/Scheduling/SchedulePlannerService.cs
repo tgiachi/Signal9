@@ -137,6 +137,113 @@ public sealed class SchedulePlannerService
         return episodes[(idx + 1) % episodes.Count].Id;
     }
 
+    public static int EmitMediaWithBreaks(
+        ChannelEntity channel,
+        ChannelMediaEntity media,
+        DateTime startUtc,
+        int maxDurationSeconds,
+        Guid? sourceBlockId,
+        IReadOnlyList<ChannelMediaEntity> adsPool,
+        IReadOnlyList<ChannelMediaEntity> bumpersPool,
+        Random rng,
+        List<ScheduledEntryEntity> sink)
+    {
+        ArgumentNullException.ThrowIfNull(channel);
+        ArgumentNullException.ThrowIfNull(media);
+        ArgumentNullException.ThrowIfNull(adsPool);
+        ArgumentNullException.ThrowIfNull(bumpersPool);
+        ArgumentNullException.ThrowIfNull(rng);
+        ArgumentNullException.ThrowIfNull(sink);
+
+        var mediaDuration = Math.Min(media.DurationSeconds ?? maxDurationSeconds, maxDurationSeconds);
+        if (mediaDuration <= 0) return 0;
+
+        var interval = Math.Max(1, channel.CommercialIntervalMinSeconds);
+        var jitter = Math.Max(0, channel.CommercialIntervalJitterSeconds);
+        var breakSize = Math.Max(0, channel.CommercialBreakSize);
+        var totalParts = channel.CommercialsEnabled
+            ? Math.Max(1, (int)Math.Ceiling((double)mediaDuration / interval))
+            : 1;
+
+        var cursor = startUtc;
+        var remaining = mediaDuration;
+        var partIndex = 0;
+        var offset = 0;
+
+        while (remaining > 0)
+        {
+            var chunkPlanned = channel.CommercialsEnabled
+                ? interval + (jitter > 0 ? rng.Next(-jitter, jitter + 1) : 0)
+                : remaining;
+            var chunk = Math.Min(chunkPlanned, remaining);
+            if (chunk <= 0) chunk = remaining;
+
+            sink.Add(new ScheduledEntryEntity
+            {
+                Id = Guid.NewGuid(),
+                ChannelId = channel.Id,
+                SourceBlockId = sourceBlockId,
+                StartAt = cursor,
+                DurationSeconds = chunk,
+                Kind = ScheduledEntryKind.Media,
+                ChannelMediaId = media.Id,
+                MediaPartIndex = partIndex,
+                MediaPartCount = totalParts,
+                MediaOffsetSeconds = offset
+            });
+
+            cursor = cursor.AddSeconds(chunk);
+            remaining -= chunk;
+            offset += chunk;
+            partIndex++;
+
+            if (remaining > 0 && channel.CommercialsEnabled)
+            {
+                if (channel.CommercialBumpersEnabled && bumpersPool.Count > 0)
+                {
+                    cursor = EmitOne(channel, sourceBlockId, bumpersPool[rng.Next(bumpersPool.Count)], cursor, ScheduledEntryKind.Bumper, sink, DefaultBumperDurationSeconds);
+                }
+                for (var i = 0; i < breakSize; i++)
+                {
+                    if (adsPool.Count == 0) break;
+                    cursor = EmitOne(channel, sourceBlockId, adsPool[rng.Next(adsPool.Count)], cursor, ScheduledEntryKind.Commercial, sink, DefaultCommercialDurationSeconds);
+                }
+                if (channel.CommercialBumpersEnabled && bumpersPool.Count > 0)
+                {
+                    cursor = EmitOne(channel, sourceBlockId, bumpersPool[rng.Next(bumpersPool.Count)], cursor, ScheduledEntryKind.Bumper, sink, DefaultBumperDurationSeconds);
+                }
+            }
+        }
+
+        return (int)(cursor - startUtc).TotalSeconds;
+    }
+
+    private static DateTime EmitOne(
+        ChannelEntity channel,
+        Guid? sourceBlockId,
+        ChannelMediaEntity item,
+        DateTime cursor,
+        ScheduledEntryKind kind,
+        List<ScheduledEntryEntity> sink,
+        int defaultDurationSeconds)
+    {
+        var dur = item.DurationSeconds is > 0 ? item.DurationSeconds.Value : defaultDurationSeconds;
+        sink.Add(new ScheduledEntryEntity
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = channel.Id,
+            SourceBlockId = sourceBlockId,
+            StartAt = cursor,
+            DurationSeconds = dur,
+            Kind = kind,
+            ChannelMediaId = item.Id,
+            MediaPartIndex = 0,
+            MediaPartCount = 1,
+            MediaOffsetSeconds = 0
+        });
+        return cursor.AddSeconds(dur);
+    }
+
     public static Guid? ResolveFallback(ChannelEntity channel, ResolveContext ctx)
     {
         ArgumentNullException.ThrowIfNull(channel);

@@ -264,4 +264,94 @@ public class SchedulePlannerServiceTests
         var picked = SchedulePlannerService.ResolveFallback(channel, ctx);
         Assert.Equal(movie.Id, picked);
     }
+
+    [Fact]
+    public void EmitMediaWithBreaks_NoBreaks_SingleEntry()
+    {
+        var channel = new ChannelEntity
+        {
+            CommercialsEnabled = false,
+            CommercialIntervalMinSeconds = 60
+        };
+        var media = new ChannelMediaEntity
+        {
+            Id = Guid.NewGuid(),
+            DurationSeconds = 30,
+            Type = ChannelMediaType.Movies,
+            IsActive = true
+        };
+        var start = new DateTime(2026, 6, 1, 20, 0, 0, DateTimeKind.Utc);
+        var sink = new List<ScheduledEntryEntity>();
+
+        var rng = new Random(42);
+        var elapsed = SchedulePlannerService.EmitMediaWithBreaks(
+            channel,
+            media,
+            start,
+            maxDurationSeconds: 30,
+            sourceBlockId: null,
+            adsPool: Array.Empty<ChannelMediaEntity>(),
+            bumpersPool: Array.Empty<ChannelMediaEntity>(),
+            rng,
+            sink);
+
+        Assert.Equal(30, elapsed);
+        Assert.Single(sink);
+        Assert.Equal(ScheduledEntryKind.Media, sink[0].Kind);
+        Assert.Equal(30, sink[0].DurationSeconds);
+        Assert.Equal(0, sink[0].MediaPartIndex);
+        Assert.Equal(1, sink[0].MediaPartCount);
+        Assert.Equal(media.Id, sink[0].ChannelMediaId);
+    }
+
+    [Fact]
+    public void EmitMediaWithBreaks_OneBreak_SplitsMediaAndInsertsAdsAndBumpers()
+    {
+        var channel = new ChannelEntity
+        {
+            CommercialsEnabled = true,
+            CommercialBumpersEnabled = true,
+            CommercialBreakSize = 2,
+            CommercialIntervalMinSeconds = 600,    // 10 minutes
+            CommercialIntervalJitterSeconds = 0    // deterministic for the test
+        };
+        var media = new ChannelMediaEntity
+        {
+            Id = Guid.NewGuid(),
+            DurationSeconds = 1200,                // 20 minutes → exactly 1 break expected
+            Type = ChannelMediaType.Movies,
+            IsActive = true
+        };
+        var ad1 = new ChannelMediaEntity { Id = Guid.NewGuid(), DurationSeconds = 30, Type = ChannelMediaType.Commercial };
+        var ad2 = new ChannelMediaEntity { Id = Guid.NewGuid(), DurationSeconds = 30, Type = ChannelMediaType.Commercial };
+        var bumper = new ChannelMediaEntity { Id = Guid.NewGuid(), DurationSeconds = 8, Type = ChannelMediaType.Bumper };
+        var start = new DateTime(2026, 6, 1, 20, 0, 0, DateTimeKind.Utc);
+        var sink = new List<ScheduledEntryEntity>();
+
+        var rng = new Random(123);
+        var elapsed = SchedulePlannerService.EmitMediaWithBreaks(
+            channel,
+            media,
+            start,
+            maxDurationSeconds: 1200,
+            sourceBlockId: null,
+            adsPool: new[] { ad1, ad2 },
+            bumpersPool: new[] { bumper },
+            rng,
+            sink);
+
+        // 600s media + 8s bumper + 30s + 30s + 8s bumper + 600s media = 1276s
+        Assert.Equal(1276, elapsed);
+        Assert.Equal(6, sink.Count);
+        Assert.Equal(ScheduledEntryKind.Media, sink[0].Kind);
+        Assert.Equal(600, sink[0].DurationSeconds);
+        Assert.Equal(ScheduledEntryKind.Bumper, sink[1].Kind);
+        Assert.Equal(ScheduledEntryKind.Commercial, sink[2].Kind);
+        Assert.Equal(ScheduledEntryKind.Commercial, sink[3].Kind);
+        Assert.Equal(ScheduledEntryKind.Bumper, sink[4].Kind);
+        Assert.Equal(ScheduledEntryKind.Media, sink[5].Kind);
+        Assert.Equal(600, sink[5].DurationSeconds);
+        Assert.Equal(1, sink[5].MediaPartIndex);
+        Assert.Equal(600, sink[5].MediaOffsetSeconds);
+    }
 }
