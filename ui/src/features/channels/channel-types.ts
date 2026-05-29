@@ -9,6 +9,10 @@ export type ChannelResponse = {
   commercialsEnabled: boolean;
   commercialIntervalMinSeconds: number;
   commercialIntervalMaxSeconds: number;
+  outputWidth: number;
+  outputHeight: number;
+  outputVideoBitrateKbps: number;
+  videoEffectsJson: string | null;
   createdAt: string;
   updatedAt: string;
 };
