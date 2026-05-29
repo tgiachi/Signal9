@@ -86,6 +86,8 @@ builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
 builder.Services.AddSingleton<SignalNine.Web.Services.Scheduling.SchedulePlannerService>();
 builder.Services.AddSingleton<IJobHandler, SignalNine.Web.Services.Scheduling.SchedulePlanJobHandler>();
 builder.Services.AddHostedService<SignalNine.Web.Services.Scheduling.SchedulePlannerCronService>();
+builder.Services.AddSingleton<SignalNine.Web.Services.Streaming.ChannelStreamCoordinator>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<SignalNine.Web.Services.Streaming.ChannelStreamCoordinator>());
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);
