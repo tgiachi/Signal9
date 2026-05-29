@@ -76,7 +76,9 @@ public class FreeSqlFactory
             Directory.CreateDirectory(databaseDirectory);
         }
 
-        return $"Data Source={databasePath}";
+        // WAL + Busy Timeout + Pooling lets multiple pipeline workers update concurrently
+        // without "database is locked" failures under high write load.
+        return $"Data Source={databasePath};Journal Mode=WAL;Synchronous=Normal;Busy Timeout=10000;Pooling=True";
     }
 
     private string GetPostgreSqlConnectionString(string databaseUrl)

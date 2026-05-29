@@ -1,12 +1,15 @@
 import { NavLink } from 'react-router';
 import {
   Activity,
+  Cpu,
   Database,
+  Film,
   ListChecks,
   RadioTower,
   ScrollText,
   Server,
   Settings,
+  Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -14,6 +17,9 @@ const TABS = [
   { to: '/monitor', label: 'Monitor', icon: Activity },
   { to: '/channels', label: 'Channels', icon: RadioTower },
   { to: '/media-libraries', label: 'Libraries', icon: Database },
+  { to: '/media', label: 'Media', icon: Film },
+  { to: '/pipelines', label: 'Pipelines', icon: Workflow },
+  { to: '/ffmpeg', label: 'FFmpeg', icon: Cpu },
   { to: '/jobs', label: 'Jobs', icon: ListChecks },
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/settings/jellyfin', label: 'Jellyfin', icon: Server },

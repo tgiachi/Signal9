@@ -35,14 +35,41 @@ public static class ChannelMediaEndpoints
         return app;
     }
 
-    private static IResult Stream(
+    private static async Task<IResult> Stream(
         Guid id,
+        HttpContext ctx,
         IDataAccess<ChannelMediaEntity> media,
-        IDataAccess<MediaLibraryEntity> libraries
+        IDataAccess<MediaLibraryEntity> libraries,
+        IJellyfinConnectionService jellyfinConnection,
+        IHttpClientFactory httpClientFactory,
+        CancellationToken cancellationToken
     )
     {
         var entity = media.GetByKey(id);
         if (entity is null) return TypedResults.NotFound();
+
+        if (entity.SourceType == MediaSourceType.Jellyfin)
+        {
+            if (string.IsNullOrWhiteSpace(entity.SourceRef))
+            {
+                return TypedResults.NotFound();
+            }
+            var creds = await jellyfinConnection.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
+            if (creds is null)
+            {
+                return TypedResults.Problem(
+                    detail: "Jellyfin connection is not configured.",
+                    statusCode: 503
+                );
+            }
+            var baseUrl = creds.Value.BaseUrl.TrimEnd('/');
+            var upstream =
+                $"{baseUrl}/Videos/{Uri.EscapeDataString(entity.SourceRef)}/stream?static=true"
+                + $"&api_key={Uri.EscapeDataString(creds.Value.ApiKey)}";
+            await ProxyAsync(ctx, httpClientFactory, upstream, cancellationToken).ConfigureAwait(false);
+            return Results.Empty;
+        }
+
         if (entity.SourceType != MediaSourceType.LocalFile)
         {
             return TypedResults.Problem(
@@ -73,6 +100,80 @@ public static class ChannelMediaEndpoints
         }
 
         return Results.File(fullPath, contentType, enableRangeProcessing: true);
+    }
+
+    private static async Task ProxyAsync(
+        HttpContext ctx,
+        IHttpClientFactory httpClientFactory,
+        string upstream,
+        CancellationToken cancellationToken
+    )
+    {
+        var client = httpClientFactory.CreateClient("jellyfin-stream");
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, upstream);
+
+        // Forward Range / If-Range / If-Modified-Since headers so the browser
+        // can seek without buffering the whole video first.
+        if (ctx.Request.Headers.TryGetValue("Range", out var range))
+        {
+            req.Headers.TryAddWithoutValidation("Range", (string[])range!);
+        }
+        if (ctx.Request.Headers.TryGetValue("If-Range", out var ifRange))
+        {
+            req.Headers.TryAddWithoutValidation("If-Range", (string[])ifRange!);
+        }
+        if (ctx.Request.Headers.TryGetValue("If-Modified-Since", out var ims))
+        {
+            req.Headers.TryAddWithoutValidation("If-Modified-Since", (string[])ims!);
+        }
+
+        using var resp = await client
+            .SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Translate upstream 4xx-on-missing-media into a clearer 404 so the UI can show
+        // "media file not available" instead of leaking openresty's bare "Bad Request".
+        if (resp.StatusCode == System.Net.HttpStatusCode.BadRequest
+            || resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            ctx.Response.ContentType = "application/problem+json";
+            await ctx.Response.WriteAsync(
+                "{\"title\":\"Media file not available\",\"detail\":\"The Jellyfin server does not have a streamable file for this item.\",\"status\":404}",
+                cancellationToken
+            ).ConfigureAwait(false);
+            return;
+        }
+
+        ctx.Response.StatusCode = (int)resp.StatusCode;
+
+        foreach (var h in resp.Headers)
+        {
+            if (IsHopByHopHeader(h.Key)) continue;
+            ctx.Response.Headers[h.Key] = h.Value.ToArray();
+        }
+        foreach (var h in resp.Content.Headers)
+        {
+            if (IsHopByHopHeader(h.Key)) continue;
+            ctx.Response.Headers[h.Key] = h.Value.ToArray();
+        }
+        // Aspnet sets transfer-encoding chunked when we stream; let it manage.
+        ctx.Response.Headers.Remove("transfer-encoding");
+
+        await resp.Content.CopyToAsync(ctx.Response.Body, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool IsHopByHopHeader(string name)
+    {
+        return string.Equals(name, "Connection", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Keep-Alive", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Proxy-Authenticate", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Proxy-Authorization", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "TE", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Trailer", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Upgrade", StringComparison.OrdinalIgnoreCase);
     }
 
     private static Ok<IReadOnlyList<ChannelMediaResponse>> List(

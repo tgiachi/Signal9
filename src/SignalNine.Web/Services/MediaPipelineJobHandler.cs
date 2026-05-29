@@ -57,13 +57,35 @@ public class MediaPipelineJobHandler : IJobHandler
         var resolvedPath = await resolver.ResolveAsync(mediaEntity, library, cancellationToken).ConfigureAwait(false);
         var pipelineContext = new PipelineContext(mediaEntity, library, resolvedPath, context);
 
-        foreach (var task in tasks.OrderBy(t => t.Order))
+        var displayName = BuildDisplayName(mediaEntity);
+
+        var enabledTasks = tasks
+            .Where(t => t.IsEnabled)
+            .OrderBy(t => t.Order)
+            .ToList();
+
+        if (enabledTasks.Count == 0)
+        {
+            await jobs.ReportProgressAsync(
+                context.JobId,
+                100,
+                $"No pipeline tasks enabled · {displayName}",
+                cancellationToken
+            ).ConfigureAwait(false);
+        }
+
+        for (var i = 0; i < enabledTasks.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!task.IsEnabled)
-            {
-                continue;
-            }
+            var task = enabledTasks[i];
+            var percent = (int)((double)i / enabledTasks.Count * 100);
+
+            await jobs.ReportProgressAsync(
+                context.JobId,
+                percent,
+                $"{task.Name} · {displayName}",
+                cancellationToken
+            ).ConfigureAwait(false);
 
             try
             {
@@ -86,5 +108,31 @@ public class MediaPipelineJobHandler : IJobHandler
 
         mediaEntity.UpdatedAt = DateTime.UtcNow;
         media.Update(mediaEntity);
+
+        if (enabledTasks.Count > 0)
+        {
+            await jobs.ReportProgressAsync(
+                context.JobId,
+                100,
+                $"Done · {displayName}",
+                cancellationToken
+            ).ConfigureAwait(false);
+        }
+    }
+
+    private static string BuildDisplayName(ChannelMediaEntity media)
+    {
+        var title = string.IsNullOrWhiteSpace(media.Title)
+            ? media.Id.ToString()[..8]
+            : media.Title;
+
+        if (!string.IsNullOrWhiteSpace(media.TvSeriesName))
+        {
+            var season = media.TvSeason ?? 0;
+            var episode = media.TvEpisode ?? 0;
+            return $"{media.TvSeriesName} S{season:00}E{episode:00} - {title}";
+        }
+
+        return title;
     }
 }

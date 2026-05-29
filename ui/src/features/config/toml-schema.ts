@@ -81,3 +81,6 @@ export const SCHEMA: readonly SectionSpec[] = [
     ],
   },
 ] as const;
+
+
+export const FALLBACK_SCHEMA: readonly SectionSpec[] = SCHEMA;

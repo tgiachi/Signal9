@@ -59,6 +59,7 @@ builder.Services.AddScoped<IJellyfinService, JellyfinService>();
 builder.Services.AddDataProtection();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient("jellyfin", c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient("jellyfin-stream", c => c.Timeout = Timeout.InfiniteTimeSpan);
 builder.Services.AddSingleton<IProcessLauncher, DefaultProcessLauncher>();
 builder.Services.AddSingleton<IFfmpegPool>(sp =>
     new FfmpegPool(

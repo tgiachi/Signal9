@@ -132,18 +132,40 @@ public class JellyfinService : IJellyfinService
         ArgumentException.ThrowIfNullOrWhiteSpace(itemId);
         if (maxImages <= 0) return Array.Empty<JellyfinPreviewImage>();
 
+        var results = await FetchImagesForAsync(itemId, maxImages, ct).ConfigureAwait(false);
+        if (results.Count > 0) return results;
+
+        // Fallback: episode (or any item) with no own images — try the series/parent.
+        var parentId = await ResolveSeriesIdAsync(itemId, ct).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(parentId)) return results;
+
+        return await FetchImagesForAsync(parentId, maxImages, ct).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<JellyfinPreviewImage>> FetchImagesForAsync(
+        string itemId,
+        int maxImages,
+        CancellationToken ct)
+    {
         var infos = await GetAsync<List<ImageInfoDto>>($"Items/{Uri.EscapeDataString(itemId)}/Images", ct)
             .ConfigureAwait(false);
         if (infos is null || infos.Count == 0) return Array.Empty<JellyfinPreviewImage>();
 
         var ordered = infos
-            .Where(i => !string.IsNullOrWhiteSpace(i.ImageType))
+            .Where(i => !string.IsNullOrWhiteSpace(i.ImageType) && IsSupportedImageType(i.ImageType!))
             .OrderBy(i => i.ImageType switch
             {
                 "Primary" => 0,
                 "Thumb" => 1,
-                "Backdrop" => 2,
-                _ => 3
+                "Screenshot" => 2,
+                "Backdrop" => 3,
+                "Art" => 4,
+                "Banner" => 5,
+                "Logo" => 6,
+                "Disc" => 7,
+                "Box" => 8,
+                "BoxRear" => 9,
+                _ => 99
             })
             .ThenBy(i => i.ImageIndex ?? 0)
             .Take(maxImages)
@@ -163,6 +185,36 @@ public class JellyfinService : IJellyfinService
         }
 
         return results;
+    }
+
+    private async Task<string?> ResolveSeriesIdAsync(string itemId, CancellationToken ct)
+    {
+        // Use the search-style endpoint — some Jellyfin streamers reject
+        // /Items/{id}?Fields=... with HTTP 400 but accept /Items?Ids={id}&Fields=...
+        var result = await GetAsync<ItemsResultDto>(
+            $"Items?Ids={Uri.EscapeDataString(itemId)}&Fields=SeriesId,ParentId",
+            ct,
+            allowNotFound: true
+        ).ConfigureAwait(false);
+        var dto = result?.Items?.FirstOrDefault();
+        if (dto is null) return null;
+        if (!string.IsNullOrWhiteSpace(dto.SeriesId)) return dto.SeriesId;
+        if (!string.IsNullOrWhiteSpace(dto.ParentId)) return dto.ParentId;
+        return null;
+    }
+
+    private static bool IsSupportedImageType(string imageType)
+    {
+        return imageType is "Primary"
+            or "Thumb"
+            or "Screenshot"
+            or "Backdrop"
+            or "Art"
+            or "Banner"
+            or "Logo"
+            or "Disc"
+            or "Box"
+            or "BoxRear";
     }
 
     public async Task<JellyfinItemTags> GetItemTagsAsync(string itemId, CancellationToken ct = default)
@@ -315,6 +367,8 @@ public class JellyfinService : IJellyfinService
         public int? IndexNumber { get; set; }
         public List<string>? Tags { get; set; }
         public List<string>? Genres { get; set; }
+        public string? SeriesId { get; set; }
+        public string? ParentId { get; set; }
     }
 
     private sealed class ImageInfoDto
