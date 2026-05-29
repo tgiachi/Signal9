@@ -26,6 +26,10 @@ const FIRST_CHANNEL: ChannelResponse = {
   commercialsEnabled: true,
   commercialIntervalMinSeconds: 120,
   commercialIntervalMaxSeconds: 300,
+  outputWidth: 1280,
+  outputHeight: 720,
+  outputVideoBitrateKbps: 2500,
+  videoEffectsJson: null,
   createdAt: '2026-05-27T10:00:00Z',
   updatedAt: '2026-05-27T10:00:00Z',
 };
