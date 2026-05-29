@@ -236,5 +236,6 @@ app.MapHub<LogsHub>("/hubs/logs")
    .AllowAnonymous();
 app.MapFfmpegPoolEndpoints();
 app.MapHub<FfmpegPoolHub>("/hubs/ffmpeg").RequireAuthorization();
+app.MapScheduleEndpoints();
 
 app.Run();
