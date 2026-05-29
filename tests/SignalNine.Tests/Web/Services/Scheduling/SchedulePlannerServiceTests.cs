@@ -230,4 +230,38 @@ public class SchedulePlannerServiceTests
 
         Assert.Null(SchedulePlannerService.ResolveBlock(block, ctx));
     }
+
+    [Fact]
+    public void ResolveFallback_UsesChannelFallbackTagAndType()
+    {
+        var match = new ChannelMediaEntity { Id = Guid.NewGuid(), Type = ChannelMediaType.Movies, IsActive = true };
+        var skip = new ChannelMediaEntity { Id = Guid.NewGuid(), Type = ChannelMediaType.Commercial, IsActive = true };
+        var channel = new ChannelEntity
+        {
+            Id = Guid.NewGuid(),
+            FallbackTagFilterCsv = null,
+            FallbackTypeFilterCsv = "Movies"
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            new[] { match, skip },
+            new Dictionary<Guid, HashSet<string>>(),
+            new DateTime(2026, 6, 1, 23, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(match.Id, SchedulePlannerService.ResolveFallback(channel, ctx));
+    }
+
+    [Fact]
+    public void ResolveFallback_DefaultsToMoviesAndTvShowWhenNoFilter()
+    {
+        var movie = new ChannelMediaEntity { Id = Guid.NewGuid(), Type = ChannelMediaType.Movies, IsActive = true };
+        var ad = new ChannelMediaEntity { Id = Guid.NewGuid(), Type = ChannelMediaType.Commercial, IsActive = true };
+        var channel = new ChannelEntity { Id = Guid.NewGuid() };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            new[] { movie, ad },
+            new Dictionary<Guid, HashSet<string>>(),
+            new DateTime(2026, 6, 1, 23, 0, 0, DateTimeKind.Utc));
+
+        var picked = SchedulePlannerService.ResolveFallback(channel, ctx);
+        Assert.Equal(movie.Id, picked);
+    }
 }

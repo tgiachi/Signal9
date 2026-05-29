@@ -137,6 +137,20 @@ public sealed class SchedulePlannerService
         return episodes[(idx + 1) % episodes.Count].Id;
     }
 
+    public static Guid? ResolveFallback(ChannelEntity channel, ResolveContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(channel);
+        ArgumentNullException.ThrowIfNull(ctx);
+
+        var typeFilter = channel.FallbackTypeFilterCsv;
+        if (string.IsNullOrWhiteSpace(typeFilter))
+        {
+            typeFilter = $"{ChannelMediaType.Movies},{ChannelMediaType.TvShow}";
+        }
+
+        return ResolveTagPool(channel.Id, channel.FallbackTagFilterCsv, typeFilter, ctx);
+    }
+
     public static ScheduleBlockEntity? FindBlockCovering(
         IEnumerable<ScheduleBlockEntity> blocks,
         DateTime cursor)
