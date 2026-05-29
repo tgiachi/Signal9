@@ -83,6 +83,7 @@ builder.Services.AddSingleton<IPipelineTaskConfigSchemaProvider, JellyfinPreview
 builder.Services.AddSingleton<IPipelineTaskConfigSchemaProvider, ExtractPreviewsTaskConfigSchemaProvider>();
 builder.Services.AddSingleton<ConfigSchemaService>();
 builder.Services.AddSingleton<IJobHandler, MediaPipelineJobHandler>();
+builder.Services.AddSingleton<SignalNine.Web.Services.Scheduling.SchedulePlannerService>();
 builder.Services.AddSingleton<IJobNotificationPublisher, SignalRJobNotificationPublisher>();
 builder.Services.AddSingleton<IJobManager, InMemoryJobManager>();
 builder.Services.AddSingleton(freeSqlFactory);

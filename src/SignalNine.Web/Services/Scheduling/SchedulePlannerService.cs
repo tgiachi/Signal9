@@ -18,13 +18,108 @@ public sealed class SchedulePlannerService
         _scopeFactory = scopeFactory;
     }
 
-    public Task<int> PlanChannelAsync(
+    public async Task<int> PlanChannelAsync(
         Guid channelId,
         DateTime fromUtc,
         DateTime toUtc,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(0);
+        if (toUtc <= fromUtc) return 0;
+
+        using var scope = _scopeFactory.CreateScope();
+        var sp = scope.ServiceProvider;
+        var channels = sp.GetRequiredService<IDataAccess<ChannelEntity>>();
+        var blocks = sp.GetRequiredService<IDataAccess<ScheduleBlockEntity>>();
+        var media = sp.GetRequiredService<IDataAccess<ChannelMediaEntity>>();
+        var joins = sp.GetRequiredService<IDataAccess<ChannelMediaTagEntity>>();
+        var tags = sp.GetRequiredService<IDataAccess<TagEntity>>();
+        var entries = sp.GetRequiredService<IDataAccess<ScheduledEntryEntity>>();
+
+        var channel = channels.GetByKey(channelId)
+                      ?? throw new InvalidOperationException($"Channel {channelId} not found.");
+        var allMedia = media.List();
+        var channelBlocks = blocks.List().Where(b => b.ChannelId == channelId && b.IsActive).ToList();
+
+        // Build TagsByMedia: media.Id → set of tag names
+        var tagsById = tags.List().ToDictionary(t => t.Id, t => t.Name);
+        var tagsByMedia = new Dictionary<Guid, HashSet<string>>();
+        foreach (var join in joins.List())
+        {
+            if (!tagsById.TryGetValue(join.TagId, out var name)) continue;
+            if (!tagsByMedia.TryGetValue(join.ChannelMediaId, out var set))
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                tagsByMedia[join.ChannelMediaId] = set;
+            }
+            set.Add(name);
+        }
+
+        var ads = allMedia.Where(m => m.Type == ChannelMediaType.Commercial && m.IsActive).ToList();
+        var bumpers = allMedia.Where(m => m.Type == ChannelMediaType.Bumper && m.IsActive).ToList();
+        var mediaById = allMedia.ToDictionary(m => m.Id);
+
+        // Clear existing future entries for this channel from fromUtc
+        var stale = entries.List().Where(e => e.ChannelId == channelId && e.StartAt >= fromUtc).Select(e => e.Id).ToList();
+        foreach (var id in stale) entries.Delete(id);
+
+        var rng = new Random((int)(HashCombine(channelId, fromUtc.Ticks) & 0x7FFFFFFF));
+        var sink = new List<ScheduledEntryEntity>();
+        var cursor = fromUtc;
+
+        while (cursor < toUtc)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var block = FindBlockCovering(channelBlocks, cursor);
+            Guid? mediaId;
+            Guid? sourceBlockId;
+            int slotEnd;
+
+            if (block is not null)
+            {
+                var ctx = new ResolveContext(allMedia, tagsByMedia, cursor);
+                mediaId = ResolveBlock(block, ctx);
+                sourceBlockId = block.Id;
+                var blockStart = StartOfBlockOccurrence(block, cursor);
+                slotEnd = (int)Math.Min(
+                    (blockStart.AddMinutes(block.DurationMinutes) - cursor).TotalSeconds,
+                    (toUtc - cursor).TotalSeconds);
+            }
+            else
+            {
+                mediaId = ResolveFallback(channel, new ResolveContext(allMedia, tagsByMedia, cursor));
+                sourceBlockId = null;
+                slotEnd = (int)(toUtc - cursor).TotalSeconds;
+            }
+
+            if (mediaId is null || !mediaById.TryGetValue(mediaId.Value, out var pickedMedia))
+            {
+                // No pickable media in this slot — advance one minute and continue.
+                cursor = cursor.AddMinutes(1);
+                continue;
+            }
+
+            sink.Clear();
+            var elapsed = EmitMediaWithBreaks(channel, pickedMedia, cursor, slotEnd, sourceBlockId, ads, bumpers, rng, sink);
+            foreach (var entry in sink) entries.Insert(entry);
+            cursor = cursor.AddSeconds(elapsed);
+
+            if (block is not null && block.RuleType == ScheduleBlockRuleType.Series)
+            {
+                block.SeriesCursorChannelMediaId = mediaId;
+                block.UpdatedAt = DateTime.UtcNow;
+                blocks.Update(block);
+            }
+        }
+
+        return await Task.FromResult(entries.List().Count(e => e.ChannelId == channelId && e.StartAt >= fromUtc));
+    }
+
+    private static DateTime StartOfBlockOccurrence(ScheduleBlockEntity block, DateTime cursor)
+    {
+        var daysBack = (int)cursor.DayOfWeek - (int)block.DayOfWeek;
+        if (daysBack < 0) daysBack += 7;
+        var date = cursor.Date.AddDays(-daysBack);
+        return DateTime.SpecifyKind(date.Add(block.StartTime), DateTimeKind.Utc);
     }
 
     public sealed record ResolveContext(

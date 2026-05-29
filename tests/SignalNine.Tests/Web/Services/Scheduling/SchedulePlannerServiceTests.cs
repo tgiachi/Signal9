@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using SignalNine.Persistence.Entities.Channels;
+using SignalNine.Persistence.Interfaces;
 using SignalNine.Persistence.Types;
 using SignalNine.Web.Services.Scheduling;
 
@@ -353,5 +356,68 @@ public class SchedulePlannerServiceTests
         Assert.Equal(600, sink[5].DurationSeconds);
         Assert.Equal(1, sink[5].MediaPartIndex);
         Assert.Equal(600, sink[5].MediaOffsetSeconds);
+    }
+
+    [Fact]
+    public async Task PlanChannelAsync_OneBlock_EmitsEntriesInRange()
+    {
+        await using var factory = new WebApplicationFactory<Program>();
+        var rootDir = Path.Combine(Path.GetTempPath(), $"schedule-test-{Guid.NewGuid():N}");
+        Environment.SetEnvironmentVariable("SIGNAL9_ROOT_DIRECTORY", rootDir);
+        try
+        {
+            using var scope = factory.Services.CreateScope();
+            var sp = scope.ServiceProvider;
+            var channels = sp.GetRequiredService<IDataAccess<ChannelEntity>>();
+            var media = sp.GetRequiredService<IDataAccess<ChannelMediaEntity>>();
+            var blocks = sp.GetRequiredService<IDataAccess<ScheduleBlockEntity>>();
+            var entries = sp.GetRequiredService<IDataAccess<ScheduledEntryEntity>>();
+            var planner = sp.GetRequiredService<SchedulePlannerService>();
+
+            var channel = new ChannelEntity
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test",
+                Slug = "test",
+                IsActive = true,
+                CommercialsEnabled = false
+            };
+            channels.Insert(channel);
+
+            var movie = new ChannelMediaEntity
+            {
+                Id = Guid.NewGuid(),
+                Title = "Inception",
+                Type = ChannelMediaType.Movies,
+                DurationSeconds = 7200,
+                IsActive = true
+            };
+            media.Insert(movie);
+
+            var block = new ScheduleBlockEntity
+            {
+                Id = Guid.NewGuid(),
+                ChannelId = channel.Id,
+                DayOfWeek = DayOfWeek.Monday,
+                StartTime = new TimeSpan(20, 0, 0),
+                DurationMinutes = 120,
+                RuleType = ScheduleBlockRuleType.Pin,
+                PinnedChannelMediaId = movie.Id,
+                IsActive = true
+            };
+            blocks.Insert(block);
+
+            var monday = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            var written = await planner.PlanChannelAsync(channel.Id, monday, monday.AddDays(1));
+
+            Assert.True(written >= 1);
+            var emitted = entries.List().Where(e => e.ChannelId == channel.Id).OrderBy(e => e.StartAt).ToList();
+            Assert.Contains(emitted, e => e.ChannelMediaId == movie.Id && e.Kind == ScheduledEntryKind.Media);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SIGNAL9_ROOT_DIRECTORY", null);
+            if (Directory.Exists(rootDir)) Directory.Delete(rootDir, recursive: true);
+        }
     }
 }
