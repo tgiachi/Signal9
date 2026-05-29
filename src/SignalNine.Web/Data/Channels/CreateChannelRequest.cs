@@ -8,5 +8,10 @@ public record CreateChannelRequest(
     int DisplayOrder,
     bool CommercialsEnabled,
     int CommercialIntervalMinSeconds,
-    int CommercialIntervalMaxSeconds
+    int CommercialIntervalMaxSeconds,
+    int CommercialBreakSize = 2,
+    int CommercialIntervalJitterSeconds = 120,
+    bool CommercialBumpersEnabled = true,
+    string? FallbackTagFilterCsv = null,
+    string? FallbackTypeFilterCsv = null
 );

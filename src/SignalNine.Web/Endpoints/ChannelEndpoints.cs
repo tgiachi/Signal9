@@ -69,6 +69,11 @@ public static class ChannelEndpoints
             CommercialsEnabled = request.CommercialsEnabled,
             CommercialIntervalMinSeconds = request.CommercialIntervalMinSeconds,
             CommercialIntervalMaxSeconds = request.CommercialIntervalMaxSeconds,
+            CommercialBreakSize = request.CommercialBreakSize,
+            CommercialIntervalJitterSeconds = request.CommercialIntervalJitterSeconds,
+            CommercialBumpersEnabled = request.CommercialBumpersEnabled,
+            FallbackTagFilterCsv = request.FallbackTagFilterCsv,
+            FallbackTypeFilterCsv = request.FallbackTypeFilterCsv,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -105,6 +110,11 @@ public static class ChannelEndpoints
         entity.CommercialsEnabled = request.CommercialsEnabled;
         entity.CommercialIntervalMinSeconds = request.CommercialIntervalMinSeconds;
         entity.CommercialIntervalMaxSeconds = request.CommercialIntervalMaxSeconds;
+        entity.CommercialBreakSize = request.CommercialBreakSize;
+        entity.CommercialIntervalJitterSeconds = request.CommercialIntervalJitterSeconds;
+        entity.CommercialBumpersEnabled = request.CommercialBumpersEnabled;
+        entity.FallbackTagFilterCsv = request.FallbackTagFilterCsv;
+        entity.FallbackTypeFilterCsv = request.FallbackTypeFilterCsv;
         entity.UpdatedAt = DateTime.UtcNow;
 
         dataAccess.Update(entity);
@@ -124,6 +134,8 @@ public static class ChannelEndpoints
         new(
             e.Id, e.Name, e.Slug, e.Description, e.LogoUrl, e.DisplayOrder,
             e.IsActive, e.CommercialsEnabled, e.CommercialIntervalMinSeconds, e.CommercialIntervalMaxSeconds,
-            e.CreatedAt, e.UpdatedAt
+            e.CreatedAt, e.UpdatedAt,
+            e.CommercialBreakSize, e.CommercialIntervalJitterSeconds, e.CommercialBumpersEnabled,
+            e.FallbackTagFilterCsv, e.FallbackTypeFilterCsv
         );
 }

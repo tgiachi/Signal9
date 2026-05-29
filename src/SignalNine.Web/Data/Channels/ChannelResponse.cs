@@ -12,5 +12,10 @@ public record ChannelResponse(
     int CommercialIntervalMinSeconds,
     int CommercialIntervalMaxSeconds,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    int CommercialBreakSize,
+    int CommercialIntervalJitterSeconds,
+    bool CommercialBumpersEnabled,
+    string? FallbackTagFilterCsv,
+    string? FallbackTypeFilterCsv
 );
