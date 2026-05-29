@@ -7,13 +7,36 @@ export function blocksKey(channelId: string) {
   return ['schedule-blocks', channelId] as const;
 }
 
+const DAY_INDEX: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+
+type RawBlock = Omit<ScheduleBlock, 'dayOfWeek'> & { dayOfWeek: number | string };
+
+function normalize(raw: RawBlock): ScheduleBlock {
+  const day =
+    typeof raw.dayOfWeek === 'number'
+      ? raw.dayOfWeek
+      : (DAY_INDEX[raw.dayOfWeek] ?? 0);
+  return { ...raw, dayOfWeek: day };
+}
+
 export function useScheduleBlocks(channelId: string) {
   const auth = useAuth();
   const qc = useQueryClient();
 
   const list = useQuery({
     queryKey: blocksKey(channelId),
-    queryFn: () => apiJson<ScheduleBlock[]>(`/api/channels/${channelId}/schedule/blocks`),
+    queryFn: async () => {
+      const data = await apiJson<RawBlock[]>(`/api/channels/${channelId}/schedule/blocks`);
+      return data.map(normalize);
+    },
     enabled: auth.authenticated && !!channelId,
   });
 
