@@ -124,7 +124,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    // Read-side only: accept enum payloads sent as strings (e.g. "Series")
+    // from the SPA without changing the response shape (which stays numeric
+    // for backwards-compat with existing test clients + TS types).
+    options.SerializerOptions.Converters.Add(new SignalNine.Web.Services.Json.LenientNumericEnumConverter());
 });
 builder.Services.Configure<FormOptions>(
     options =>
