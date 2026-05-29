@@ -42,8 +42,82 @@ public sealed class SchedulePlannerService
         {
             ScheduleBlockRuleType.Pin => block.PinnedChannelMediaId,
             ScheduleBlockRuleType.Series => ResolveSeries(block, ctx),
+            ScheduleBlockRuleType.TagPool => ResolveTagPool(
+                block.Id,
+                block.TagFilterCsv,
+                block.TypeFilterCsv,
+                ctx),
             _ => null
         };
+    }
+
+    public static Guid? ResolveTagPool(
+        Guid seedSource,
+        string? tagFilterCsv,
+        string? typeFilterCsv,
+        ResolveContext ctx)
+    {
+        var allowedTypes = ParseTypeFilter(typeFilterCsv);
+        var requiredTags = ParseTagFilter(tagFilterCsv);
+
+        var candidates = ctx.AllMedia
+            .Where(m => m.IsActive)
+            .Where(m => allowedTypes is null || allowedTypes.Contains(m.Type))
+            .Where(m =>
+            {
+                if (requiredTags.Count == 0) return true;
+                return ctx.TagsByMedia.TryGetValue(m.Id, out var tags)
+                       && requiredTags.All(rt => tags.Contains(rt));
+            })
+            .OrderBy(m => m.Id)
+            .ToList();
+        if (candidates.Count == 0) return null;
+
+        var seed = HashCombine(seedSource, (long)(ctx.Cursor.Date - DateTime.UnixEpoch).TotalDays);
+        var rng = new Random((int)(seed & 0x7FFFFFFF));
+        return candidates[rng.Next(candidates.Count)].Id;
+    }
+
+    private static HashSet<ChannelMediaType>? ParseTypeFilter(string? csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv)) return null;
+        var set = new HashSet<ChannelMediaType>();
+        foreach (var token in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Enum.TryParse<ChannelMediaType>(token, ignoreCase: true, out var t))
+            {
+                set.Add(t);
+            }
+        }
+        return set.Count == 0 ? null : set;
+    }
+
+    private static HashSet<string> ParseTagFilter(string? csv)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(csv)) return set;
+        foreach (var token in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            set.Add(token);
+        }
+        return set;
+    }
+
+    private static long HashCombine(Guid g, long extra)
+    {
+        var bytes = g.ToByteArray();
+        unchecked
+        {
+            long h = (long)14695981039346656037UL;
+            foreach (var b in bytes)
+            {
+                h ^= b;
+                h *= 1099511628211L;
+            }
+            h ^= extra;
+            h *= 1099511628211L;
+            return h;
+        }
     }
 
     private static Guid? ResolveSeries(ScheduleBlockEntity block, ResolveContext ctx)

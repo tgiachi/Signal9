@@ -168,4 +168,66 @@ public class SchedulePlannerServiceTests
 
         Assert.Equal(e1.Id, SchedulePlannerService.ResolveBlock(block, ctx));
     }
+
+    [Fact]
+    public void ResolveBlock_TagPool_OnlyMatchingMedia_PicksOne()
+    {
+        var match = new ChannelMediaEntity { Id = Guid.NewGuid(), Type = ChannelMediaType.Movies, IsActive = true };
+        var skip = new ChannelMediaEntity { Id = Guid.NewGuid(), Type = ChannelMediaType.TvShow, IsActive = true };
+        var block = new ScheduleBlockEntity
+        {
+            Id = Guid.NewGuid(),
+            RuleType = ScheduleBlockRuleType.TagPool,
+            TagFilterCsv = "action",
+            TypeFilterCsv = "Movies"
+        };
+        var tags = new Dictionary<Guid, HashSet<string>>
+        {
+            [match.Id] = new(StringComparer.OrdinalIgnoreCase) { "action", "sci-fi" },
+            [skip.Id] = new(StringComparer.OrdinalIgnoreCase) { "drama" }
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            new[] { match, skip }, tags, new DateTime(2026, 6, 1, 20, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(match.Id, SchedulePlannerService.ResolveBlock(block, ctx));
+    }
+
+    [Fact]
+    public void ResolveBlock_TagPool_DeterministicAcrossRuns()
+    {
+        var ids = Enumerable.Range(0, 10)
+            .Select(_ => new ChannelMediaEntity { Id = Guid.NewGuid(), Type = ChannelMediaType.Movies, IsActive = true })
+            .ToList();
+        var tags = ids.ToDictionary(m => m.Id, _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "action" });
+        var block = new ScheduleBlockEntity
+        {
+            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            RuleType = ScheduleBlockRuleType.TagPool,
+            TagFilterCsv = "action",
+            TypeFilterCsv = "Movies"
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(ids, tags, new DateTime(2026, 6, 1, 20, 0, 0, DateTimeKind.Utc));
+
+        var first = SchedulePlannerService.ResolveBlock(block, ctx);
+        var second = SchedulePlannerService.ResolveBlock(block, ctx);
+
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void ResolveBlock_TagPool_NoMatches_ReturnsNull()
+    {
+        var block = new ScheduleBlockEntity
+        {
+            Id = Guid.NewGuid(),
+            RuleType = ScheduleBlockRuleType.TagPool,
+            TagFilterCsv = "horror"
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            Array.Empty<ChannelMediaEntity>(),
+            new Dictionary<Guid, HashSet<string>>(),
+            DateTime.UtcNow);
+
+        Assert.Null(SchedulePlannerService.ResolveBlock(block, ctx));
+    }
 }
