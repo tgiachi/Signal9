@@ -41,8 +41,26 @@ public sealed class SchedulePlannerService
         return block.RuleType switch
         {
             ScheduleBlockRuleType.Pin => block.PinnedChannelMediaId,
+            ScheduleBlockRuleType.Series => ResolveSeries(block, ctx),
             _ => null
         };
+    }
+
+    private static Guid? ResolveSeries(ScheduleBlockEntity block, ResolveContext ctx)
+    {
+        if (string.IsNullOrWhiteSpace(block.SeriesName)) return null;
+        var episodes = ctx.AllMedia
+            .Where(m => m.IsActive
+                        && m.Type == ChannelMediaType.TvShow
+                        && string.Equals(m.TvSeriesName, block.SeriesName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(m => m.TvSeason ?? 0)
+            .ThenBy(m => m.TvEpisode ?? 0)
+            .ToList();
+        if (episodes.Count == 0) return null;
+        if (block.SeriesCursorChannelMediaId is null) return episodes[0].Id;
+        var idx = episodes.FindIndex(m => m.Id == block.SeriesCursorChannelMediaId.Value);
+        if (idx < 0) return episodes[0].Id;
+        return episodes[(idx + 1) % episodes.Count].Id;
     }
 
     public static ScheduleBlockEntity? FindBlockCovering(

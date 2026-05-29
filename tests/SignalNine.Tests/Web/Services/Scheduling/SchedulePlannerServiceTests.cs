@@ -97,4 +97,75 @@ public class SchedulePlannerServiceTests
 
         Assert.Null(SchedulePlannerService.ResolveBlock(block, ctx));
     }
+
+    private static ChannelMediaEntity Ep(string series, int season, int episode, Guid? id = null)
+    {
+        return new ChannelMediaEntity
+        {
+            Id = id ?? Guid.NewGuid(),
+            Type = ChannelMediaType.TvShow,
+            TvSeriesName = series,
+            TvSeason = season,
+            TvEpisode = episode,
+            IsActive = true
+        };
+    }
+
+    [Fact]
+    public void ResolveBlock_Series_FirstRun_ReturnsFirstEpisode()
+    {
+        var e1 = Ep("Ken", 1, 1);
+        var e2 = Ep("Ken", 1, 2);
+        var block = new ScheduleBlockEntity
+        {
+            RuleType = ScheduleBlockRuleType.Series,
+            SeriesName = "Ken",
+            SeriesCursorChannelMediaId = null
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            new[] { e2, e1 },
+            new Dictionary<Guid, HashSet<string>>(),
+            DateTime.UtcNow);
+
+        Assert.Equal(e1.Id, SchedulePlannerService.ResolveBlock(block, ctx));
+    }
+
+    [Fact]
+    public void ResolveBlock_Series_AfterCursor_ReturnsNextEpisode()
+    {
+        var e1 = Ep("Ken", 1, 1);
+        var e2 = Ep("Ken", 1, 2);
+        var e3 = Ep("Ken", 1, 3);
+        var block = new ScheduleBlockEntity
+        {
+            RuleType = ScheduleBlockRuleType.Series,
+            SeriesName = "Ken",
+            SeriesCursorChannelMediaId = e2.Id
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            new[] { e1, e2, e3 },
+            new Dictionary<Guid, HashSet<string>>(),
+            DateTime.UtcNow);
+
+        Assert.Equal(e3.Id, SchedulePlannerService.ResolveBlock(block, ctx));
+    }
+
+    [Fact]
+    public void ResolveBlock_Series_LastEpisode_WrapsToFirst()
+    {
+        var e1 = Ep("Ken", 1, 1);
+        var e2 = Ep("Ken", 1, 2);
+        var block = new ScheduleBlockEntity
+        {
+            RuleType = ScheduleBlockRuleType.Series,
+            SeriesName = "Ken",
+            SeriesCursorChannelMediaId = e2.Id
+        };
+        var ctx = new SchedulePlannerService.ResolveContext(
+            new[] { e1, e2 },
+            new Dictionary<Guid, HashSet<string>>(),
+            DateTime.UtcNow);
+
+        Assert.Equal(e1.Id, SchedulePlannerService.ResolveBlock(block, ctx));
+    }
 }
