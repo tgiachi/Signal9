@@ -112,7 +112,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                        if (
                            !string.IsNullOrWhiteSpace(accessToken) &&
                            (path.StartsWithSegments(JobsHubPathPrefix) ||
-                               (path.StartsWithSegments("/api/media") && path.Value!.EndsWith("/stream")))
+                               (path.StartsWithSegments("/api/media") && path.Value!.EndsWith("/stream")) ||
+                           (path.StartsWithSegments("/api/channels") && path.Value!.Contains("/stream/")))
                        )
                        {
                            context.Token = accessToken;
@@ -246,5 +247,6 @@ app.MapHub<LogsHub>("/hubs/logs")
 app.MapFfmpegPoolEndpoints();
 app.MapHub<FfmpegPoolHub>("/hubs/ffmpeg").RequireAuthorization();
 app.MapScheduleEndpoints();
+app.MapStreamEndpoints();
 
 app.Run();
