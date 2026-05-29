@@ -6,6 +6,7 @@ using SignalNine.Core.Interfaces;
 using SignalNine.Core.Services.Ffmpeg;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
+using SignalNine.Persistence.Types;
 using SignalNine.Web.Data.Pipeline;
 using SignalNine.Web.Services.Pipeline;
 
@@ -150,13 +151,29 @@ public class ExtractPreviewsTaskTests : IDisposable
     {
         var pool = new StubPool();
         var directories = new DirectoriesConfig(_rootDir, Enum.GetNames<DirectoryType>());
-        var config = new PipelineConfig();
+        var config = new PipelineConfig
+        {
+            Tasks = new PipelineTasksConfig
+            {
+                Preview = new PipelinePreviewTaskConfig
+                {
+                    Enabled = true,
+                    OverwriteExisting = true,
+                    AllowJellyfinStreamFallback = true,
+                    PreviewCount = 5
+                }
+            }
+        };
         var task = new ExtractPreviewsTask(pool, directories, config);
         return (task, pool, directories, config);
     }
 
     private static PipelineContext NewContext(ChannelMediaEntity media)
     {
+        if (media.SourceType == MediaSourceType.Jellyfin && string.IsNullOrWhiteSpace(media.SourceRef))
+        {
+            media.SourceType = MediaSourceType.LocalFile;
+        }
         return new PipelineContext(
             media,
             new MediaLibraryEntity { Id = Guid.NewGuid(), Name = "L", IsActive = true, SourceRef = "/x" },

@@ -6,6 +6,7 @@ using SignalNine.Core.Services.Ffmpeg;
 using SignalNine.Core.Types;
 using SignalNine.Persistence.Entities.Channels;
 using SignalNine.Persistence.Interfaces;
+using SignalNine.Persistence.Types;
 using SignalNine.Web.Data.Pipeline;
 using SignalNine.Web.Services.Pipeline;
 
@@ -17,13 +18,29 @@ public class ProbeMediaTaskTests
     {
         var pool = new StubPool();
         var media = new StubMediaAccess();
-        var config = new PipelineConfig { OverwriteExistingProbe = overwrite };
+        var config = new PipelineConfig
+        {
+            OverwriteExistingProbe = overwrite,
+            Tasks = new PipelineTasksConfig
+            {
+                Probe = new PipelineProbeTaskConfig
+                {
+                    Enabled = true,
+                    OverwriteExisting = overwrite,
+                    AllowJellyfinStreamProbe = true
+                }
+            }
+        };
         var task = new ProbeMediaTask(pool, media, config);
         return (task, pool, media, config);
     }
 
     private static PipelineContext NewContext(ChannelMediaEntity media)
     {
+        if (media.SourceType == MediaSourceType.Jellyfin && string.IsNullOrWhiteSpace(media.SourceRef))
+        {
+            media.SourceType = MediaSourceType.LocalFile;
+        }
         return new PipelineContext(
             media,
             new MediaLibraryEntity { Id = Guid.NewGuid(), Name = "L", IsActive = true, SourceRef = "/x" },
