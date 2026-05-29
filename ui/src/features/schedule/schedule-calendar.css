@@ -1,0 +1,176 @@
+/* Dark-theme override for react-big-calendar. Library default CSS targets a light
+   theme and uses inline styles in some spots, so a number of these need !important. */
+
+.rbc-calendar {
+  background: var(--bg-2);
+  color: var(--fg-1);
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.rbc-toolbar {
+  padding: 8px 10px;
+  background: var(--bg-4);
+  color: var(--fg-1);
+  border-bottom: 1px solid var(--bg-1);
+  border-radius: 6px 6px 0 0;
+  gap: 8px;
+}
+.rbc-toolbar button {
+  background: var(--bg-2);
+  color: var(--fg-1);
+  border: 1px solid var(--bg-1);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rbc-toolbar button:hover,
+.rbc-toolbar button:focus {
+  background: var(--bg-3);
+  color: var(--fg-0);
+  outline: none;
+}
+.rbc-toolbar button.rbc-active {
+  background: var(--accent-jobs);
+  color: var(--fg-0);
+  border-color: var(--accent-jobs);
+  box-shadow: none;
+}
+.rbc-toolbar-label {
+  color: var(--fg-0);
+  font-weight: 600;
+}
+
+/* Header strip (days of week) */
+.rbc-time-view {
+  border: none !important;
+  background: var(--bg-2);
+}
+.rbc-time-header {
+  background: var(--bg-4);
+  border-bottom: 1px solid var(--bg-1) !important;
+}
+.rbc-time-header.rbc-overflowing {
+  border-right: 1px solid var(--bg-1) !important;
+}
+.rbc-time-header-content {
+  border-left: 1px solid var(--bg-1) !important;
+}
+.rbc-header {
+  background: var(--bg-4) !important;
+  color: var(--fg-1);
+  border-bottom: none !important;
+  padding: 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rbc-header + .rbc-header {
+  border-left: 1px solid var(--bg-1) !important;
+}
+.rbc-today {
+  background: rgba(0, 184, 148, 0.08) !important;
+}
+
+/* Time gutter (hours column on the left) */
+.rbc-time-gutter,
+.rbc-time-column {
+  background: var(--bg-2);
+}
+.rbc-time-gutter .rbc-timeslot-group {
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--bg-1);
+}
+.rbc-label {
+  color: var(--fg-3);
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+/* Day columns + time slot grid */
+.rbc-day-slot {
+  background: var(--bg-2);
+}
+.rbc-time-content {
+  border-top: 1px solid var(--bg-1) !important;
+  background: var(--bg-2);
+}
+.rbc-time-content > * + * > * {
+  border-left: 1px solid var(--bg-1) !important;
+}
+.rbc-timeslot-group {
+  border-bottom: 1px solid var(--bg-1) !important;
+  min-height: 44px;
+}
+.rbc-time-slot {
+  border-top: 1px solid rgba(255, 255, 255, 0.02);
+}
+.rbc-day-slot .rbc-time-slot {
+  border-top: 1px dotted rgba(255, 255, 255, 0.05);
+}
+.rbc-current-time-indicator {
+  background-color: var(--accent-live) !important;
+  height: 2px !important;
+}
+
+/* Events (blocks) */
+.rbc-event {
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  color: var(--fg-0) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.rbc-event:focus {
+  outline: 2px solid var(--fg-0);
+  outline-offset: -2px;
+}
+.rbc-event-label {
+  font-size: 10px;
+  opacity: 0.85;
+}
+.rbc-event-content {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.rbc-selected {
+  outline: 2px solid var(--accent-live);
+  outline-offset: -2px;
+}
+
+/* Slot selection (drag-to-create) */
+.rbc-slot-selection {
+  background: rgba(9, 132, 227, 0.25) !important;
+  border: 1px dashed var(--accent-jobs) !important;
+  color: var(--fg-0) !important;
+  font-size: 11px !important;
+}
+
+/* Off-range, all-day, etc. */
+.rbc-off-range-bg {
+  background: var(--bg-5) !important;
+}
+.rbc-allday-cell {
+  display: none !important; /* hide all-day row — we don't use it */
+}
+.rbc-time-header-cell {
+  min-height: auto !important;
+}
+
+/* Scrollbar — match dark UI */
+.rbc-time-content::-webkit-scrollbar,
+.rbc-time-view::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.rbc-time-content::-webkit-scrollbar-track {
+  background: var(--bg-1);
+}
+.rbc-time-content::-webkit-scrollbar-thumb {
+  background: var(--bg-3);
+  border-radius: 4px;
+}

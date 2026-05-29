@@ -2,6 +2,7 @@ import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { it } from 'date-fns/locale/it';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import './schedule-calendar.css';
 import type { ScheduleBlock } from './schedule-types';
 
 const locales = { 'it-IT': it };
@@ -46,21 +47,38 @@ export function ScheduleBlockGrid({ blocks, onSelectSlot, onSelectEvent }: Props
     return { id: b.id, title: b.name, start, end, resource: b };
   });
 
+  const scrollToTime = new Date();
+  scrollToTime.setHours(8, 0, 0, 0);
+
   return (
-    <div className="h-[640px] rounded-md bg-bg-2 p-2">
+    <div className="h-[720px] rounded-md bg-bg-2">
       <Calendar<CalEvent>
         localizer={localizer}
         events={events}
-        defaultView={Views.WORK_WEEK}
-        views={[Views.WORK_WEEK, Views.WEEK, Views.DAY]}
+        defaultView={Views.WEEK}
+        views={[Views.WEEK, Views.WORK_WEEK, Views.DAY]}
         selectable
         step={30}
         timeslots={2}
+        scrollToTime={scrollToTime}
+        culture="it-IT"
         onSelectSlot={(s) => onSelectSlot({ start: s.start as Date, end: s.end as Date })}
         onSelectEvent={(ev) => onSelectEvent(ev.resource)}
         eventPropGetter={(ev) => {
           const block = ev.resource;
-          return { style: { backgroundColor: RULE_COLOR[block.ruleType] ?? '#4a5568' } };
+          return {
+            style: {
+              backgroundColor: RULE_COLOR[block.ruleType] ?? '#4a5568',
+              opacity: block.isActive ? 1 : 0.45,
+            },
+          };
+        }}
+        formats={{
+          timeGutterFormat: 'HH:mm',
+          eventTimeRangeFormat: ({ start, end }, culture, l) =>
+            `${l?.format(start, 'HH:mm', culture)}–${l?.format(end, 'HH:mm', culture)}`,
+          dayFormat: 'EEE dd',
+          dayHeaderFormat: 'EEEE dd MMM',
         }}
         toolbar
       />
