@@ -10,6 +10,7 @@ using SignalNine.Web.Data.Schedule;
 
 namespace SignalNine.Tests.Web;
 
+[Collection(WebApplicationCollection.Name)]
 public class ScheduleEndpointsTests : IDisposable
 {
     private const string RootDirectoryVariableName = "SIGNAL9_ROOT_DIRECTORY";
