@@ -26,4 +26,25 @@ public sealed class SchedulePlannerService
     {
         return Task.FromResult(0);
     }
+
+    public static ScheduleBlockEntity? FindBlockCovering(
+        IEnumerable<ScheduleBlockEntity> blocks,
+        DateTime cursor)
+    {
+        ArgumentNullException.ThrowIfNull(blocks);
+        foreach (var block in blocks)
+        {
+            if (!block.IsActive) continue;
+            if (block.DayOfWeek != cursor.DayOfWeek) continue;
+            var startSeconds = (int)block.StartTime.TotalSeconds;
+            var endSeconds = startSeconds + block.DurationMinutes * 60;
+            var cursorSeconds = (int)cursor.TimeOfDay.TotalSeconds;
+            if (cursorSeconds >= startSeconds && cursorSeconds < endSeconds)
+            {
+                return block;
+            }
+        }
+
+        return null;
+    }
 }
